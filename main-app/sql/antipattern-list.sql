@@ -1,12 +1,12 @@
 -- 1. テーブルの作成 (CREATE TABLE)
-CREATE OR REPLACE TABLE `ea-agentspacepj.audit_master.antipattern_master` (
+CREATE OR REPLACE TABLE `<saas_project_id>.audit_master.antipattern_master` (
     pattern_name STRING NOT NULL OPTIONS(description="ツールが出力するアンチパターン名（Key）"),
     problem_description STRING NOT NULL OPTIONS(description="BigQueryのアーキテクチャ的に何が悪いのか（Why）"),
     best_practice STRING NOT NULL OPTIONS(description="Geminiに提案させるべき正しい修正案・定石（How）")
 );
 
 -- 2. マスターデータの投入 (INSERT)
-INSERT INTO `ea-agentspacepj.audit_master.antipattern_master` (pattern_name, problem_description, best_practice)
+INSERT INTO `<saas_project_id>.audit_master.antipattern_master` (pattern_name, problem_description, best_practice)
 VALUES
     ('SimpleSelectStar',
      '必要なカラムだけを指定しないと、列指向DBであるBigQueryでは無駄なスキャン量（課金）が跳ね上がります。',
