@@ -120,68 +120,52 @@ set -a
 source ../.env
 set +a
 
-# 実行するサービスアカウントのアドレスを定義
-PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
-SA_EMAIL="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+# サービスアカウントの名前とメールアドレスを定義
+SA_NAME="gemini-bq-query-analyzer-sa"
+SA_EMAIL="${SA_NAME}@${SAAS_PROJECT_ID}.iam.gserviceaccount.com"
+
+gcloud iam service-accounts create $SA_NAME \
+    --display-name="Gemini Query Analyzer Service Account" \
+    --project=$SAAS_PROJECT_ID
 
 # ==========================================
 # A. SaaSプロジェクト側への権限付与（実行基盤）
 # ==========================================
-# Gemini (Vertex AI) の実行権限
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/aiplatform.user"
 
-# bq-antipattern-analyzer (API) の呼び出し権限
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/run.invoker"
+SAAS_ROLES=(
+    "roles/aiplatform.user"         # Gemini (Vertex AI) の実行権限
+    "roles/run.invoker"             # bq-antipattern-analyzer (API) の呼び出し権限
+    "roles/bigquery.jobUser"        # Saasプロジェクトでジョブ実行権限（ドライラン実行)
+    "roles/bigquery.dataViewer"     # masterテーブルを閲覧する権限
+    "roles/storage.objectAdmin"     # Cloud Runデプロイのため
+    "roles/artifactregistry.writer" # Cloud Runデプロイのため
+    "roles/logging.logWriter"       # Cloud Runデプロイおよびツールログ書き出し
+)
 
-# BigQueryのジョブ実行権限（ドライラン実行、および自社辞書の読み取り用）
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/bigquery.jobUser"
-
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/bigquery.dataViewer"
-
-# Cloud Storage のオブジェクト管理者
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/storage.objectAdmin"
-
-# Artifact Registry の書き込み
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/artifactregistry.writer"
-
-# ログ記録者
-gcloud projects add-iam-policy-binding $(gcloud config get-value project) \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/logging.logWriter"
+for ROLE in ${SAAS_ROLES[@]}; do
+    gcloud projects add-iam-policy-binding $SAAS_PROJECT_ID \
+        --member="serviceAccount:${SA_EMAIL}" \
+        --role="$ROLE" \
+        --condition=None
+done
 
 # ==========================================
 # B. 顧客プロジェクト側への権限付与（分析対象）
 # ==========================================
 
-# BigQuery メタデータ閲覧者（各テーブルのスキーマやパーティション構成を取得するため）
-gcloud projects add-iam-policy-binding ${CUSTOMER_PROJECT_ID} \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/bigquery.metadataViewer"
-
-# BigQuery リソース閲覧者（INFORMATION_SCHEMA.JOBS からプロジェクト全体のクエリ履歴を取得するため）
-gcloud projects add-iam-policy-binding ${CUSTOMER_PROJECT_ID} \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/bigquery.resourceViewer"
-    # --role="roles/bigquery.resourceAdmin"
-
-# Cloud Storage オブジェクト作成者（レポートMarkdownをGCSバケットに保存するため）
+CUSTOMER_ROLES=(
+    "roles/bigquery.metadataViewer" # BigQuery メタデータ閲覧者（各テーブルのスキーマやパーティション構成を取得するため）
+    "roles/bigquery.resourceViewer" # BigQuery リソース閲覧者（INFORMATION_SCHEMA.JOBS からプロジェクト全体のクエリ履歴を取得するため）
+    "roles/storage.objectCreator"   # # Cloud Storage オブジェクト作成者（レポートMarkdownをGCSバケットに保存するため）
 # 対象のバケットを指定する
-gcloud projects add-iam-policy-binding ${CUSTOMER_PROJECT_ID} \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="roles/storage.objectCreator"
-    # --role="roles/storage.objectUser"
+)
+
+for ROLE in ${CUSTOMER_ROLES[@]}; do
+    gcloud projects add-iam-policy-binding $CUSTOMER_PROJECT_ID \
+        --member="serviceAccount:${SA_EMAIL}" \
+        --role="$ROLE" \
+        --condition=None
+done
 ```
 
 1. Cloud Run Jobsの作成（gcr.ioは非推奨のためソースコードから直接）
@@ -198,6 +182,7 @@ export REGION="us-central1" # 任意のリージョン
 gcloud run jobs deploy gemini-bq-query-analyzer-job \
     --source . \
     --region $REGION \
+    --service-account=${SA_EMAIL} \
     --set-env-vars SAAS_PROJECT_ID=${SAAS_PROJECT_ID} \
     --set-env-vars CUSTOMER_PROJECT_ID=${CUSTOMER_PROJECT_ID} \
     --set-env-vars BQ_ANTIPATTERN_ANALYZER_URL=${BQ_ANTIPATTERN_ANALYZER_URL} \

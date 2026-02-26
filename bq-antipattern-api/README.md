@@ -68,11 +68,20 @@ Google Cloud SDK (`gcloud`) を使用して、ソースコードから直接Clou
 ```bash
 cd bq-antipattern-api
 
+# デフォルトのサービスアカウント使用
 gcloud run deploy bq-antipattern-api \
     --source . \
     --region asia-northeast1 \
     --memory 1Gi \
     --no-allow-unauthenticated
+
+# 指定のサービスアカウント使用
+gcloud run deploy bq-antipattern-api \
+    --source . \
+    --region asia-northeast1 \
+    --memory 1Gi \
+    --no-allow-unauthenticated \
+    --service-account=${SA_EMAIL}
 ```
 
 * `--source .`: Cloud Buildが自動でDockerfileを解釈し、クラウド上でビルドを行います。
