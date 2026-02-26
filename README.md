@@ -45,6 +45,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 * 本システムを稼働させるには、SaaSプロジェクト側のBigQueryにアンチパターンの**マスター辞書テーブル**が存在している必要があります。
 `docs/` 配下にあるDDLスクリプトを使用して、事前に `audit_master.antipattern_master` テーブルを作成・データ投入しておいてください。
 * bq-antipattern-apiを事前にデプロイしている必要があります。
+* 検査対象の顧客プロジェクトにGCSバケットを作成し、IAMロールを付与していただく必要があります。
 
 ---
 
