@@ -64,24 +64,17 @@ docker run -p 8080:8080 antipattern-api-local
 ## ☁️ Google Cloud (Cloud Run) へのデプロイ
 
 Google Cloud SDK (`gcloud`) を使用して、ソースコードから直接Cloud Runへデプロイします。
+事前にサービスアカウントの作成とロール付与を済ませておく必要があります。
 
 ```bash
 cd bq-antipattern-api
 
-# デフォルトのサービスアカウント使用
 gcloud run deploy bq-antipattern-api \
     --source . \
     --region asia-northeast1 \
+    --service-account=${SA_EMAIL} \
     --memory 1Gi \
     --no-allow-unauthenticated
-
-# 指定のサービスアカウント使用
-gcloud run deploy bq-antipattern-api \
-    --source . \
-    --region asia-northeast1 \
-    --memory 1Gi \
-    --no-allow-unauthenticated \
-    --service-account=${SA_EMAIL}
 ```
 
 * `--source .`: Cloud Buildが自動でDockerfileを解釈し、クラウド上でビルドを行います。
@@ -95,7 +88,8 @@ TOKEN=$(gcloud auth print-identity-token)
 
 # 2. curlコマンドを使って、トークン付きで /analyze エンドポイントにPOSTリクエストを送ります
 # （あえてアンチパターンである「SELECT *」をテスト用のクエリとして投げてみます）
-curl -X POST "<cloud run service url>" \
+# 末尾に /analyze を付けたURLにリクエストを送る
+curl -X POST "<cloud run service url>/analyze" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d '{

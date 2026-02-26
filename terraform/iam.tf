@@ -12,8 +12,6 @@ locals {
     "roles/run.invoker",
     "roles/bigquery.jobUser",
     "roles/bigquery.dataViewer",
-    "roles/storage.objectAdmin",
-    "roles/artifactregistry.writer",
     "roles/logging.logWriter"
   ]
 }

@@ -99,7 +99,7 @@ TIME_RANGE_INTERVAL="1 MONTH"
 1. ローカル実行
 
 ```bash
-python src/main.py
+python main-app/src/main.py
 ```
 
 ## ☁️ Cloud Run へのデプロイ手順
@@ -115,12 +115,13 @@ gcloud services enable aiplatform.googleapis.com run.googleapis.com cloudbuild.g
 ```bash
 # .envファイルから変数を読み込む
 set -a
-source ../.env
+source .env
 set +a
 
 # サービスアカウントの名前とメールアドレスを定義
 SA_NAME="gemini-bq-query-analyzer-sa"
 SA_EMAIL="${SA_NAME}@${SAAS_PROJECT_ID}.iam.gserviceaccount.com"
+echo $SA_EMAIL
 
 gcloud iam service-accounts create $SA_NAME \
     --display-name="Gemini Query Analyzer Service Account" \
@@ -131,14 +132,20 @@ gcloud iam service-accounts create $SA_NAME \
 # ==========================================
 
 SAAS_ROLES=(
-    "roles/aiplatform.user"         # Gemini (Vertex AI) の実行権限
-    "roles/run.invoker"             # bq-antipattern-analyzer (API) の呼び出し権限
-    "roles/bigquery.jobUser"        # Saasプロジェクトでジョブ実行権限（ドライラン実行)
-    "roles/bigquery.dataViewer"     # masterテーブルを閲覧する権限
-    "roles/storage.objectAdmin"     # Cloud Runデプロイのため
-    "roles/artifactregistry.writer" # Cloud Runデプロイのため
-    "roles/logging.logWriter"       # Cloud Runデプロイおよびツールログ書き出し
+    "roles/aiplatform.user"
+    "roles/run.invoker"
+    "roles/bigquery.jobUser"
+    "roles/bigquery.dataViewer"
+    "roles/logging.logWriter"
 )
+# "roles/aiplatform.user"         # Gemini (Vertex AI) の実行権限
+# "roles/run.invoker"             # bq-antipattern-analyzer (API) の呼び出し権限
+# "roles/bigquery.jobUser"        # Saasプロジェクトでジョブ実行権限（ドライラン実行)
+# "roles/bigquery.dataViewer"     # masterテーブルを閲覧する権限
+# "roles/logging.logWriter"       # Cloud Runデプロイおよびツールログ書き出し
+for ROLE in ${SAAS_ROLES[@]}; do
+    echo $ROLE
+done
 
 for ROLE in ${SAAS_ROLES[@]}; do
     gcloud projects add-iam-policy-binding $SAAS_PROJECT_ID \
@@ -152,11 +159,16 @@ done
 # ==========================================
 
 CUSTOMER_ROLES=(
-    "roles/bigquery.metadataViewer" # BigQuery メタデータ閲覧者（各テーブルのスキーマやパーティション構成を取得するため）
-    "roles/bigquery.resourceViewer" # BigQuery リソース閲覧者（INFORMATION_SCHEMA.JOBS からプロジェクト全体のクエリ履歴を取得するため）
-    "roles/storage.objectCreator"   # # Cloud Storage オブジェクト作成者（レポートMarkdownをGCSバケットに保存するため）
-# 対象のバケットを指定する
+    "roles/bigquery.metadataViewer"
+    "roles/bigquery.resourceViewer"
+    "roles/storage.objectCreator"
 )
+# "roles/bigquery.metadataViewer" # BigQuery メタデータ閲覧者（各テーブルのスキーマやパーティション構成を取得するため）
+# "roles/bigquery.resourceViewer" # BigQuery リソース閲覧者（INFORMATION_SCHEMA.JOBS からプロジェクト全体のクエリ履歴を取得するため）
+# "roles/storage.objectCreator"   # Cloud Storage オブジェクト作成者（レポートMarkdownをGCSバケットに保存するため）
+for ROLE in ${CUSTOMER_ROLES[@]}; do
+    echo $ROLE
+done
 
 for ROLE in ${CUSTOMER_ROLES[@]}; do
     gcloud projects add-iam-policy-binding $CUSTOMER_PROJECT_ID \
@@ -207,7 +219,7 @@ gcloud scheduler jobs create http daily-analyzer-trigger \
     --schedule "0 9 * * *" \
     --uri "https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$(gcloud config get-value project)/jobs/gemini-bq-query-analyzer-job:run" \
     --http-method POST \
-    --oauth-service-account-email "${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+    --oauth-service-account-email "${SA_EMAIL}"
 ```
 
 ## 🔧 運用・メンテナンス
