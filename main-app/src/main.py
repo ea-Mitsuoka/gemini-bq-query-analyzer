@@ -140,21 +140,31 @@ def analyze_with_bq_antipattern_analyzer(query_string):
         logger.error(f"bq-antipattern-analyzer API call failed: {e}")
         return "アンチパターンの解析ツール呼び出しに失敗しました。"
 
-def get_query_schema_info(client, query, region):
-    """リージョン(location)を明示してドライランを実行する"""
+def get_query_schema_info(client, referenced_tables):
+    """INFORMATION_SCHEMA.JOBSの履歴(referenced_tables)から元のテーブルの完全なスキーマ情報を取得する"""
     schema_details = []
     try:
-        job_config = bigquery.QueryJobConfig(dry_run=True, use_query_cache=False)
-        dry_run_job = client.query(query, job_config=job_config, location=region)
-
-        # ドライラン結果から「参照しているテーブルのリスト」を取得
-        if not dry_run_job.referenced_tables:
+        # 履歴から取得した「参照しているテーブルのリスト」を確認
+        if not referenced_tables:
             return "参照しているテーブル情報が取得できませんでした。"
 
-        for table_ref in dry_run_job.referenced_tables:
+        for table_ref in referenced_tables:
             try:
-                table = client.get_table(table_ref)
-                table_name = f"{table.project}.{table.dataset_id}.{table.table_id}"
+                # table_ref は dict または Row オブジェクトとして扱う
+                if isinstance(table_ref, dict):
+                    project_id = table_ref.get("project_id")
+                    dataset_id = table_ref.get("dataset_id")
+                    table_id = table_ref.get("table_id")
+                else:
+                    project_id = getattr(table_ref, "project_id", None)
+                    dataset_id = getattr(table_ref, "dataset_id", None)
+                    table_id = getattr(table_ref, "table_id", None)
+
+                if not project_id or not dataset_id or not table_id:
+                    continue
+
+                table_name = f"{project_id}.{dataset_id}.{table_id}"
+                table = client.get_table(table_name)
                 info = [f"■ テーブル: {table_name}"]
 
                 # パーティション情報
@@ -174,14 +184,14 @@ def get_query_schema_info(client, query, region):
                 schema_details.append("\n".join(info))
 
             except Exception as e:
-                logger.warning(f"Failed to get schema for {table_ref.table_id}: {e}")
-                schema_details.append(f"■ テーブル: {table_ref.table_id} (権限不足等によりスキーマ取得失敗)")
+                logger.warning(f"Failed to get schema for {table_id}: {e}")
+                schema_details.append(f"■ テーブル: {table_id} (権限不足等によりスキーマ取得失敗)")
 
-        return "\n\n".join(schema_details)
+        return "\n\n".join(schema_details) if schema_details else "参照しているテーブル情報が取得できませんでした。"
 
     except Exception as e:
-        logger.warning(f"Dry run failed for schema extraction: {e}")
-        return "クエリの解析（ドライラン）に失敗したため、スキーマ情報を特定できませんでした。"
+        logger.warning(f"Schema extraction failed: {e}")
+        return "クエリの解析に失敗したため、スキーマ情報を特定できませんでした。"
 
 def analyze_storage_pricing(client, target_project, region, sql_template):
     """外部SQLからストレージ判定結果を取得しテキスト化する"""
@@ -458,8 +468,8 @@ def main():
         logger.info(f"Analyzing Job {i}/{len(all_jobs)}: {job.job_id} ({job.region_name})")
         logger.info("Extracting schema...")
 
-        # スキーマ情報の取得 (ドライラン時にジョブが実行された region を渡す)
-        schema_info_text = get_query_schema_info(bq_client, job.query, job.region_name)
+        # スキーマ情報の取得 (ドライランの代わりにジョブ履歴の referenced_tables を渡す)
+        schema_info_text = get_query_schema_info(bq_client, getattr(job, "referenced_tables", []))
         # 構文解析ツールの呼び出し
         antipattern_raw_text = analyze_with_bq_antipattern_analyzer(job.query)
         # メモリ上の辞書から必要なルールだけを即座に抽出

@@ -28,7 +28,9 @@ WITH base_data AS (
         END AS difficulty,
 
         -- どのリージョンの結果か
-        '{region}' AS region_name
+        '{region}' AS region_name,
+        -- テーブルのスキーマを取得するためのフィールド
+        referenced_tables
 
     FROM
         `{target_project}`.`region-{region}`.INFORMATION_SCHEMA.JOBS_BY_PROJECT
