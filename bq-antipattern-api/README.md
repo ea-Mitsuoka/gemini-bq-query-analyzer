@@ -88,7 +88,6 @@ TOKEN=$(gcloud auth print-identity-token)
 
 # 2. curlコマンドを使って、トークン付きで /analyze エンドポイントにPOSTリクエストを送ります
 # （あえてアンチパターンである「SELECT *」をテスト用のクエリとして投げてみます）
-# 末尾に /analyze を付けたURLにリクエストを送る
 curl -X POST "<cloud run service url>/analyze" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
