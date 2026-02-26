@@ -110,7 +110,7 @@ python src/main.py
 gcloud services enable aiplatform.googleapis.com run.googleapis.com cloudbuild.googleapis.com
 ```
 
-1. IAMロールの設定
+1. サービスアカウントの作成およびIAMロールの設定
 
 ```bash
 # .envファイルから変数を読み込む
