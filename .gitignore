@@ -1,0 +1,40 @@
+# Terraform files to ignore
+.terraform/
+.terraform.lock.hcl
+.terraform-version
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfbackend
+
+# Environment files
+.env
+tools/token.json
+client_secrets.json
+.venv
+*.env
+
+# Automatically created terraform files
+
+# Sphinx documentation build
+build/
+
+# Python cache files
+__pycache__/
+
+# IDE files
+.netrc
+
+# Other files
+memo*
+TODO.md
+.DS_Store
+.catignore
+list-files-for-ai.sh
+cat-for-ai.sh
+file_list.txt
+all_contents.txt
+change.patch
+.build/
+tests/test.sql
+bq-antipattern-api/*.jar

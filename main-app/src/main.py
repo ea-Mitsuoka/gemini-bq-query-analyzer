@@ -1,0 +1,497 @@
+import os
+import logging
+import requests
+import datetime
+from functools import lru_cache
+import google.auth
+import google.auth.transport.requests
+import google.oauth2.id_token
+from google.cloud import bigquery
+from google.cloud import storage
+from google.api_core.exceptions import NotFound, Forbidden
+import vertexai
+from vertexai.generative_models import GenerativeModel
+from dotenv import load_dotenv
+
+# --- ロギングの設定 ---
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+
+# ==========================================
+# 環境変数の取得
+# ==========================================
+
+# .envファイルから環境変数を読み込む (ローカル実行時のみ有効)
+load_dotenv()
+SAAS_PROJECT_ID = os.getenv("SAAS_PROJECT_ID")
+CUSTOMER_PROJECT_ID = os.getenv("CUSTOMER_PROJECT_ID")
+BQ_ANTIPATTERN_ANALYZER_URL = os.getenv("BQ_ANTIPATTERN_ANALYZER_URL")
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+LOCATION = "us-central1"        # Vertex AIのリージョン
+# 調査期間の環境変数を取得
+TIME_RANGE_INTERVAL = os.getenv("TIME_RANGE_INTERVAL")
+TIME_RANGE_START = os.getenv("TIME_RANGE_START")
+TIME_RANGE_END = os.getenv("TIME_RANGE_END")
+# 抽出するワーストクエリの件数を取得（デフォルトは1）
+WORST_QUERY_LIMIT = int(os.getenv("WORST_QUERY_LIMIT", "1"))
+# ファイルパスの設定
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WORST_RANKING_SQL_PATH = os.path.join(BASE_DIR, "sql", "worst_ranking.sql")
+STORAGE_ANALYSIS_SQL_PATH = os.path.join(BASE_DIR, "sql", "logical_vs_physical_storage_analysis.sql")
+
+
+# ==========================================
+# ヘルパー関数群
+# ==========================================
+
+def load_sql_file(filepath):
+    """外部SQLファイルを読み込む"""
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"SQL file not found: {filepath}")
+    with open(filepath, "r", encoding="utf-8") as f:
+        return f.read()
+
+def get_current_user_email(client):
+    """実行者のメールアドレスを取得（除外用）"""
+    try:
+        job = client.query("SELECT session_user() as user_email")
+        result = list(job.result())
+        return result[0].user_email
+    except Exception as e:
+        logger.warning(f"Could not detect analyzer email: {e}")
+        return "unknown"
+
+def get_active_regions(client, target_project):
+    """データセットが存在するリージョンを特定"""
+    regions = set()
+    logger.info(f"Discovering active regions in {target_project}...")
+    try:
+        datasets = list(client.list_datasets(project=target_project))
+        for dataset_item in datasets:
+            dataset = client.get_dataset(dataset_item.reference)
+            if dataset.location:
+                regions.add(dataset.location.lower())
+        return regions
+    except Exception as e:
+        logger.error(f"Error discovering regions: {e}")
+        return set()
+
+def get_time_range_expressions():
+    """調査期間の条件式を組み立てる"""
+    if TIME_RANGE_INTERVAL:
+        start_time_expr = f"TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {TIME_RANGE_INTERVAL})"
+        end_time_expr = ""
+    elif TIME_RANGE_START:
+        start_time_expr = f"TIMESTAMP('{TIME_RANGE_START}')"
+        if TIME_RANGE_END:
+            end_time_expr = f"AND creation_time <= TIMESTAMP('{TIME_RANGE_END}')"
+        else:
+            end_time_expr = ""
+    else:
+        # デフォルト設定 (1日前)
+        start_time_expr = "TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)"
+        end_time_expr = ""
+    return start_time_expr, end_time_expr
+
+# ==========================================
+# 外部API / BigQuery 解析系関数
+# ==========================================
+
+@lru_cache(maxsize=1)
+def get_oidc_token(audience):
+    """OIDCトークンを取得し、キャッシュする（高速化）"""
+    auth_req = google.auth.transport.requests.Request()
+    try:
+        # 本番環境 (Cloud Run) 用
+        return google.oauth2.id_token.fetch_id_token(auth_req, audience)
+    except Exception:
+        # ローカルテスト環境用
+        credentials, _ = google.auth.default()
+        credentials.refresh(auth_req)
+        return credentials.id_token
+
+def analyze_with_bq_antipattern_analyzer(query_string):
+    """構文解析APIを呼び出す。トークンはキャッシュを利用。"""
+    if not BQ_ANTIPATTERN_ANALYZER_URL:
+        logger.warning("BQ_ANTIPATTERN_ANALYZER_URL is not set. Skipping analyzer API call.")
+        return "API URL未設定のため解析をスキップしました。"
+
+    endpoint = f"{BQ_ANTIPATTERN_ANALYZER_URL.rstrip('/')}/analyze"
+
+    try:
+        # キャッシュされた関数からトークンを取得
+        id_token = get_oidc_token(BQ_ANTIPATTERN_ANALYZER_URL)
+
+        headers = {
+            "Authorization": f"Bearer {id_token}",
+            "Content-Type": "application/json"
+        }
+        response = requests.post(endpoint, json={"query": query_string}, headers=headers, timeout=60)
+        response.raise_for_status()
+
+        return response.json().get("recommendations", "")
+
+    except Exception as e:
+        logger.error(f"bq-antipattern-analyzer API call failed: {e}")
+        return "アンチパターンの解析ツール呼び出しに失敗しました。"
+
+def get_query_schema_info(client, query, region):
+    """リージョン(location)を明示してドライランを実行する"""
+    schema_details = []
+    try:
+        job_config = bigquery.QueryJobConfig(dry_run=True, use_query_cache=False)
+        dry_run_job = client.query(query, job_config=job_config, location=region)
+
+        # ドライラン結果から「参照しているテーブルのリスト」を取得
+        if not dry_run_job.referenced_tables:
+            return "参照しているテーブル情報が取得できませんでした。"
+
+        for table_ref in dry_run_job.referenced_tables:
+            try:
+                table = client.get_table(table_ref)
+                table_name = f"{table.project}.{table.dataset_id}.{table.table_id}"
+                info = [f"■ テーブル: {table_name}"]
+
+                # パーティション情報
+                if table.time_partitioning:
+                    part_field = table.time_partitioning.field or "_PARTITIONTIME"
+                    info.append(f"  - パーティション列: {part_field} (分割タイプ: {table.time_partitioning.type_})")
+                else:
+                    info.append("  - パーティション: 未設定 (フルスキャンのリスクあり)")
+
+                # クラスタリング情報
+                if table.clustering_fields:
+                    info.append(f"  - クラスタリング列: {', '.join(table.clustering_fields)}")
+
+                columns = [f"{f.name} ({f.field_type})" for f in table.schema]
+                info.append(f"  - カラム一覧: {', '.join(columns)}")
+
+                schema_details.append("\n".join(info))
+
+            except Exception as e:
+                logger.warning(f"Failed to get schema for {table_ref.table_id}: {e}")
+                schema_details.append(f"■ テーブル: {table_ref.table_id} (権限不足等によりスキーマ取得失敗)")
+
+        return "\n\n".join(schema_details)
+
+    except Exception as e:
+        logger.warning(f"Dry run failed for schema extraction: {e}")
+        return "クエリの解析（ドライラン）に失敗したため、スキーマ情報を特定できませんでした。"
+
+def analyze_storage_pricing(client, target_project, region, sql_template):
+    """外部SQLからストレージ判定結果を取得しテキスト化する"""
+    try:
+        # formatメソッドを使って外部SQLの変数を動的に置換
+        formatted_sql = sql_template.format(
+            target_project=target_project,
+            region=region
+        )
+        query_job = client.query(formatted_sql, location=region)
+        results = list(query_job.result())
+
+        if not results:
+            return "対象となるストレージデータがありませんでした。"
+
+        # 表のヘッダーを作成（数値カラムは右寄せ --: を使用）
+        lines = [
+            "| データセット | 論理 (GB) | 物理 (GB) | 圧縮率 | 推奨アクション |",
+            "|---|--:|--:|--:|---|"
+        ]
+        # 取得した結果を表の行として追加
+        for row in results:
+            lines.append(
+                f"| `{row.dataset_name}` | {row.logical_gb:.2f} | {row.physical_gb:.2f} "
+                f"| {row.compression_ratio:.2f} | *{row.recommendation}* |"
+            )
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.error(f"Storage analysis failed: {e}")
+        return "ストレージ分析に失敗しました。"
+
+
+# ==========================================
+# マスター辞書・プロンプト生成・通知系関数
+# ==========================================
+
+def load_master_dictionary(client, saas_project_id):
+    """マスター辞書を最初に1回だけDBから読み込み、Pythonの辞書として返す"""
+    logger.info("Loading anti-pattern master dictionary from BigQuery...")
+    master_dict = {}
+    query = f"""
+        SELECT pattern_name, problem_description, best_practice
+        FROM `{saas_project_id}.audit_master.antipattern_master`
+    """
+    try:
+        query_job = client.query(query)
+        for row in query_job:
+            master_dict[row.pattern_name] = (
+                f"■ {row.pattern_name}\n"
+                f"  - 問題点: {row.problem_description}\n"
+                f"  - 修正の定石: {row.best_practice}"
+            )
+        logger.info(f"Loaded {len(master_dict)} patterns into memory.")
+        return master_dict
+    except Exception as e:
+        logger.error(f"Failed to load master dictionary: {e}")
+        return {}
+
+def extract_relevant_dictionary(master_dict, detected_text):
+    """抽出されたテキストに含まれるKeyだけをメモリ上の辞書から取り出す"""
+    if not detected_text or not master_dict:
+        return "特になし"
+
+    relevant_texts = [text for key, text in master_dict.items() if key in detected_text]
+    return "\n\n".join(relevant_texts) if relevant_texts else "特になし"
+
+def build_gemini_prompt(job, schema_info_text, antipattern_raw_text, master_dict_text):
+    """Geminiへ渡すプロンプト文字列を生成する（責務の分離）"""
+    billed_gb = job.billed_gb if job.billed_gb is not None else 0.0
+    duration_seconds = job.duration_seconds if job.duration_seconds is not None else 0
+    slot_hours = job.slot_hours if job.slot_hours is not None else 0.0
+
+    return f"""
+    あなたはBigQueryのコスト最適化エキスパートです。
+    以下のSQLクエリの効率を診断し、改善案を提示してください。
+    SQL以外(Pythonなど)のアプリケーション側の改善案は一切不要です。
+
+    [パフォーマンス指標]
+    - スキャン量(Cost): {billed_gb:.2f} GB
+    - 実行時間(Wait): {duration_seconds} 秒
+    - CPU消費量(Load): {slot_hours:.2f} スロット時間
+      ※CPU消費量が実行時間に比べて著しく大きい場合、非効率なJOINや演算が発生しています。
+
+    [コンテキスト情報]
+    - 実行者タイプ: {job.source_type}
+    - 改善難易度: {job.difficulty}
+
+    [対象SQL]
+    {job.query}
+
+    [参照テーブルのスキーマ情報]
+    {schema_info_text}
+
+    [構文解析ツールによる指摘事項]
+    {antipattern_raw_text}
+
+    [アンチパターンの公式マニュアル（絶対のルール）]
+    {master_dict_text}
+
+    [回答の要件]
+    Markdown形式で見出しを使って簡潔に記述してください。
+    1. **改善対象**: 検査したSQL
+    2. **ボトルネックの特定**: スキャン量が多いのか、CPU消費が多いのかを明示してください。
+    3. **マニュアルの指摘事項の適用**: [構文解析ツールによる指摘事項]が存在する場合、必ず[アンチパターンの公式マニュアル]の「修正の定石」に従って解説してください。AI独自の推測でマニュアルに反する回答をしてはいけません。
+    4. **スキーマの考慮**: [参照テーブルのスキーマ情報]に「パーティション列」が存在するのに、[対象SQL]のWHERE句で使われていない場合は、強く警告して具体的な修正案を出してください。
+    5. **改善SQL**: スキーマ情報とマニュアルの定石をすべて踏まえた、具体的なRewrite案。[構文解析ツールによる指摘事項]が存在しない場合、AIの推測でSQLのどこに問題があるかを特定し、マニュアルのルールと照らし合わせて解説してください。
+    6. **実行者に応じたアドバイス**: {job.source_type}向けに記述。難易度「Low」ならすぐに設定変更を促し、「High」なら次回リリースでの修正を促してください。
+
+    [回答の禁止事項]
+    - SQL以外のアプリケーション側の改善案を提示しないこと
+    - 構文解析ツールの指摘事項がある場合、必ずマニュアルの定石に従って解説すること。AI独自の推測でマニュアルに反する回答をしてはいけません。構文解析ツールの指摘事項があっても、構文解析ツールとは別の問題箇所についてはAIの推測で指摘しても構いません。
+    - SQLの書き方に改善の余地がない場合は、「このSQLはスキャン量、実行時間、CPU消費のいずれも効率的に書かれており、改善の必要はありません。」と明確に回答すること。また、その場合は冗長な文章を避け、簡潔に回答してください。
+    """
+
+def upload_report_to_gcs(bucket_name, report_content, project_id):
+    """マークダウンレポートをGCSにアップロードし、URLを返す"""
+    if not bucket_name:
+        logger.warning("GCS_BUCKET_NAME is not set. Skipping GCS upload.")
+        return None
+    try:
+        # GCSバケットはCUSTOMER_PROJECT_IDに存在する前提
+        storage_client = storage.Client(project=project_id)
+        bucket = storage_client.bucket(bucket_name)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"bq_audit_report_{project_id}_{timestamp}.md"
+        blob = bucket.blob(filename)
+
+        # マークダウンテキストとしてアップロード
+        blob.upload_from_string(report_content, content_type="text/markdown")
+
+        # Cloud Console上の該当ファイル閲覧URLを返す（CUSTOMER_PROJECT_IDを指定）
+        return f"https://console.cloud.google.com/storage/browser/_details/{bucket_name}/{filename}?project={project_id}"
+    except Exception as e:
+        logger.error(f"Failed to upload report to GCS: {e}")
+        return None
+
+def send_to_slack(text):
+    """Slackへメッセージを送信する"""
+    if not SLACK_WEBHOOK_URL:
+        logger.warning("SLACK_WEBHOOK_URL is not set. Skipping Slack notification.")
+        return
+    try:
+        response = requests.post(SLACK_WEBHOOK_URL, json={"text": text}, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        logger.error(f"Failed to send message to Slack: {e}")
+
+
+# ==========================================
+# メインプロセス
+# ==========================================
+
+def main():
+    if not SAAS_PROJECT_ID or not CUSTOMER_PROJECT_ID:
+        logger.error("Environment variables SAAS_PROJECT_ID or CUSTOMER_PROJECT_ID are not set.")
+        return
+
+    # クライアント初期化
+    bq_client = bigquery.Client(project=SAAS_PROJECT_ID)
+    customer_bq_client = bigquery.Client(project=CUSTOMER_PROJECT_ID)
+    vertexai.init(project=SAAS_PROJECT_ID, location=LOCATION)
+    model = GenerativeModel("gemini-2.5-flash")
+
+    # 外部SQLファイルのロード
+    try:
+        worst_ranking_sql_template = load_sql_file(WORST_RANKING_SQL_PATH)
+        storage_analysis_sql_template = load_sql_file(STORAGE_ANALYSIS_SQL_PATH)
+    except FileNotFoundError as e:
+        logger.error(f"SQL file loading error: {e}")
+        return
+
+    # 基本情報の取得
+    analyzer_email = get_current_user_email(bq_client)
+    # Cloud Run では K_SERVICE 環境変数がセットされるため、それを利用して判定
+    if os.getenv("K_SERVICE"):
+        exec_env = "Cloud Run"
+    else:
+        exec_env = "Local"
+    logger.info(f"Execution Environment : {exec_env}")
+    logger.info(f"Execution Account     : {analyzer_email} (To be excluded)")
+    master_dict = load_master_dictionary(bq_client, SAAS_PROJECT_ID)
+    target_regions = get_active_regions(customer_bq_client, CUSTOMER_PROJECT_ID)
+
+    if not target_regions:
+        logger.info("No active regions found.")
+        return
+
+    start_time_expr, end_time_expr = get_time_range_expressions()
+
+    # レポート用リスト（文字列結合の最適化）
+    report_lines = []
+    report_lines.append("# BigQuery 監査レポート")
+    report_lines.append(f"**対象プロジェクト:** `{CUSTOMER_PROJECT_ID}`")
+    report_lines.append(f"**作成日時:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report_lines.append("\n---")
+
+    all_jobs = []
+    storage_proposals = []
+
+    # 1. 各リージョンからのデータ収集
+    for region in target_regions:
+        # ストレージ分析
+        proposal = analyze_storage_pricing(bq_client, CUSTOMER_PROJECT_ID, region, storage_analysis_sql_template)
+        if "対象となるストレージデータがありません" not in proposal and "失敗しました" not in proposal:
+            storage_proposals.append(f"### 📍 Region: {region}\n\n{proposal}\n")
+        logger.info(f"[{region}] Start extracting the worst queries...")
+
+        # ワーストクエリ抽出
+        formatted_sql = worst_ranking_sql_template.format(
+            target_project=CUSTOMER_PROJECT_ID,
+            region=region,
+            analyzer_email=analyzer_email,
+            start_time_expr=start_time_expr,
+            end_time_expr=end_time_expr,
+            limit=WORST_QUERY_LIMIT
+        )
+        try:
+            # リージョンを指定してINFORMATION_SCHEMAを取得
+            query_job = bq_client.query(formatted_sql, location=region)
+            all_jobs.extend(list(query_job.result()))
+        except Exception as e:
+            logger.error(f"Error or Skip in {region}: {e}")
+
+    # 2. プロジェクト全体でのワーストクエリに絞り込む
+    job_ranks = {}
+    if all_jobs:
+        # --- 全体の順位を計算して保存 ---
+        full_sorted_by_billed = sorted(all_jobs, key=lambda x: x.billed_gb or 0.0, reverse=True)
+        full_sorted_by_duration = sorted(all_jobs, key=lambda x: x.duration_seconds or 0, reverse=True)
+        for rank, j in enumerate(full_sorted_by_billed, 1):
+            if j.job_id not in job_ranks:
+                job_ranks[j.job_id] = {}
+            job_ranks[j.job_id]['cost_rank'] = rank
+        for rank, j in enumerate(full_sorted_by_duration, 1):
+            job_ranks[j.job_id]['duration_rank'] = rank
+        # ------------------------------
+
+        # スキャン容量と実行時間の両方でワーストなクエリをそれぞれ抽出
+        worst_by_billed = sorted(all_jobs, key=lambda x: x.billed_gb or 0.0, reverse=True)[:WORST_QUERY_LIMIT]
+        worst_by_duration = sorted(all_jobs, key=lambda x: x.duration_seconds or 0, reverse=True)[:WORST_QUERY_LIMIT]
+
+        # job_idをキーにして重複を排除しつつ結合
+        final_worst_jobs = {}
+        for job in worst_by_billed + worst_by_duration:
+            final_worst_jobs[job.job_id] = job
+
+        all_jobs = list(final_worst_jobs.values())
+        logger.info(f"Filtered down to project-wide worst queries: {len(all_jobs)} queries.")
+
+    # 3. ストレージ判定結果をレポートに追加
+    if storage_proposals:
+        report_lines.append("## 💾 ストレージ料金モデルの判定結果\n")
+        report_lines.append("\n".join(storage_proposals))
+        report_lines.append("---\n")
+    else:
+        logger.info("No valid storage data to report.")
+
+    # 4. ジョブがなければ終了
+    if not all_jobs:
+        logger.info("No queries to analyze.")
+        report_lines.append("対象のワーストクエリは見つかりませんでした。\n")
+        final_report = "\n".join(report_lines)
+        gcs_url = upload_report_to_gcs(GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID)
+        if gcs_url:
+            send_to_slack(f"✅ *本日の BigQuery 監査レポートが完了しました。*\n詳細なレポート（Markdown）はこちらのリンクから確認できます:\n{gcs_url}")
+        return
+
+    # 5. 各ワーストクエリの解析
+    report_lines.append(f"## 🚨 ワーストクエリ解析（計 {len(all_jobs)} 件）\n")
+
+    # 6. 各クエリに対して解析とGemini生成を実行
+    for i, job in enumerate(all_jobs, 1):
+        logger.info(f"Analyzing Job {i}/{len(all_jobs)}: {job.job_id} ({job.region_name})")
+        logger.info("Extracting schema...")
+
+        # スキーマ情報の取得 (ドライラン時にジョブが実行された region を渡す)
+        schema_info_text = get_query_schema_info(bq_client, job.query, job.region_name)
+        # 構文解析ツールの呼び出し
+        antipattern_raw_text = analyze_with_bq_antipattern_analyzer(job.query)
+        # メモリ上の辞書から必要なルールだけを即座に抽出
+        master_dict_text = extract_relevant_dictionary(master_dict, antipattern_raw_text)
+        # Geminiへのプロンプト生成
+        prompt = build_gemini_prompt(job, schema_info_text, antipattern_raw_text, master_dict_text)
+
+        try:
+            response = model.generate_content(prompt)
+            logger.info(f"Gemini Response for Job {job.job_id}:\n{response.text}\n{'-'*50}")
+            report_lines.append(f"### 🔍 ワーストクエリ {i}/{len(all_jobs)} (Job: `{job.job_id}`)\n")
+
+            # --- ランキング情報の追記 ---
+            ranks = job_ranks.get(job.job_id, {})
+            cost_rank = ranks.get('cost_rank', '-')
+            duration_rank = ranks.get('duration_rank', '-')
+            report_lines.append(f"**【プロジェクト全体ランキング】**\n- スキャン量: ワースト **{cost_rank}位**\n- 実行時間: ワースト **{duration_rank}位**\n")
+            # ---------------------------
+
+            report_lines.append(response.text)
+            report_lines.append("\n---")
+        except Exception as e:
+            logger.error(f"Failed to generate content from Gemini for Job {job.job_id}: {e}")
+
+    # 7. レポートの結合と出力
+    final_report = "\n".join(report_lines)
+    gcs_url = upload_report_to_gcs(GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID)
+
+    if gcs_url:
+        send_to_slack(f"✅ *本日の BigQuery 監査レポートが完了しました。*\n詳細なレポート（Markdown）はこちらのリンクから確認できます:\n{gcs_url}")
+    else:
+        send_to_slack("✅ *本日の BigQuery 監査レポートが完了しました。*\n(※GCSへの保存に失敗したか、バケットが未設定です)")
+
+if __name__ == "__main__":
+    main()

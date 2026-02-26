@@ -1,0 +1,26 @@
+# 仮想環境
+.venv/
+venv/
+env/
+
+# ローカルの環境変数（本番環境に混入させないため）
+.env
+*.env
+credentials.json
+*.pem
+
+# Pythonのキャッシュファイル
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Gitの履歴
+.git/
+.gitignore
+
+# VS Codeの設定ファイル
+.vscode/
+
+# その他の不要ファイル
+.DS_Store
