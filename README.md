@@ -104,15 +104,13 @@ python src/main.py
 
 ## ☁️ Cloud Run へのデプロイ手順
 
-1. 必要なAPIの有効化
+1. APIの有効化
 
 ```bash
 gcloud services enable aiplatform.googleapis.com run.googleapis.com cloudbuild.googleapis.com
 ```
 
-1. IAM権限の確認
-
-Cloud RunがGemini (Vertex AI) を呼び出せるように権限を付与します。
+1. IAMロールの設定
 
 ```bash
 # .envファイルから変数を読み込む
