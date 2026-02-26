@@ -30,7 +30,7 @@ bq-antipattern-api/
 ### 1. 準備 (JARファイルのダウンロード)
 
 本リポジトリにはファイルサイズ削減のためJARファイルを含めていません。
-公式の [GitHub Releases](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases) から最新の `bigquery-antipattern-recognition.jar` をダウンロードし、本ディレクトリ内に配置してください。
+公式の [GitHub Releases](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases) から最新の `bigquery-antipattern-recognition.jar` をダウンロードし、root/bq-antipattern-api/に配置してください。
 
 ### 2. Dockerイメージのビルド
 

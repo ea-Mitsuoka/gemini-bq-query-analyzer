@@ -73,7 +73,7 @@ for row in records:
     # enable_terraform_deploy が TRUE の顧客だけを抽出
     if str(row.get('enable_terraform_deploy', '')).upper() in ['TRUE', '1']:
         customer_name = row['対象の顧客名']
-        
+
         tfvars_content += f'  "{customer_name}" = {{\n'
         tfvars_content += f'    customer_project_id = "{row["customer_project_id"]}"\n'
         tfvars_content += f'    slack_webhook_url   = "{row["slack_webhook_url"]}"\n'
