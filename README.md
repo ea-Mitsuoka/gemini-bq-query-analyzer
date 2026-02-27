@@ -32,6 +32,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 * `src/` : メインのPythonプログラム（`main.py` 等）
 * `sql/` : 抽出用のSQLクエリ（`query.sql`）
+  * `antipattern-list.sql`:masterテーブル作成用
   * `worst_ranking.sql`: ワーストクエリ抽出用
   * `logical_vs_physical_storage_analysis.sql`: ストレージ課金モデル診断用
 * `docs/`: 関連ドキュメント（マスターテーブル作成用DDLなど）
@@ -43,7 +44,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 ## 🛑 前提条件（初回のみ）
 
 * 本システムを稼働させるには、SaaSプロジェクト側のBigQueryにアンチパターンの**マスター辞書テーブル**が存在している必要があります。
-`docs/` 配下にあるDDLスクリプトを使用して、事前に `audit_master.antipattern_master` テーブルを作成・データ投入しておいてください。
+`docs/` 配下にあるDDLスクリプトを使用して、事前に `audit_master.antipattern_master` テーブルを作成・データ投入(`antipattern-list.sql`をBigQueryのコンソールで実行)しておいてください。
 * bq-antipattern-apiを事前にデプロイしている必要があります。
 * 検査対象の顧客プロジェクトにGCSバケットを作成し、IAMロールを付与していただく必要があります。
 
