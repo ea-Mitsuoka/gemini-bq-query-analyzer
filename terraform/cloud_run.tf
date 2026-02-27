@@ -66,7 +66,7 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
 resource "google_cloud_scheduler_job" "daily_analyzer_trigger" {
   name        = "daily-analyzer-trigger"
   description = "Trigger Gemini Query Analyzer Job daily"
-  schedule    = "0 9 * * *"
+  schedule    = var.scheduler_cron
   time_zone   = "Asia/Tokyo"
   project     = var.saas_project_id
   region      = var.region

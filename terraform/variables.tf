@@ -15,3 +15,9 @@ variable "worst_query_limit" {
   type    = string
   default = "2"
 }
+
+variable "scheduler_cron" { default = "0 9 * * *" }
+
+# --- リソース名設定 ---
+variable "service_account_id" { default = "gemini-bq-query-analyzer-sa" }
+variable "bq_dataset_id" { default = "audit_master" }

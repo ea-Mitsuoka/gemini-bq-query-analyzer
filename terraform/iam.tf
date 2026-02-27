@@ -1,6 +1,6 @@
 # 2. サービスアカウントの作成
 resource "google_service_account" "analyzer_sa" {
-  account_id   = "gemini-analyzer-sa"
+  account_id   = var.service_account_id
   display_name = "Gemini Query Analyzer Service Account"
   project      = var.saas_project_id
 }

@@ -1,6 +1,6 @@
 # データセットの作成
 resource "google_bigquery_dataset" "audit_master" {
-  dataset_id  = "audit_master"
+  dataset_id  = var.bq_dataset_id
   project     = var.saas_project_id
   location    = var.region
   description = "Dataset for Gemini Query Analyzer Master Data"
