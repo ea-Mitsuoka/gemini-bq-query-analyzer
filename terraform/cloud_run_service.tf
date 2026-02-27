@@ -1,11 +1,11 @@
 resource "google_cloud_run_v2_service" "antipattern_api" {
   name     = "bq-antipattern-api"
-  location = "asia-northeast1" # APIはこれまでの指定通り東京リージョン
+  location = var.region
   project  = var.saas_project_id
 
   template {
     containers {
-      image = "us-docker.pkg.dev/cloudrun/container/hello:latest" # プレースホルダー
+      image = "us-docker.pkg.dev/cloudrun/container/hello:latest"
       resources {
         limits = {
           cpu    = "1000m"

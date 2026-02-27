@@ -1,5 +1,5 @@
 resource "google_cloud_run_v2_job" "analyzer_job" {
-  name     = "gemini-analyzer-job"
+  name     = "gemini-bq-query-analyzer-job"
   location = var.region
   project  = var.saas_project_id
 
