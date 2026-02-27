@@ -4,7 +4,6 @@ CREATE OR REPLACE TABLE `<saas_project_id>.audit_master.antipattern_master` (
     problem_description STRING NOT NULL OPTIONS(description="BigQueryのアーキテクチャ的に何が悪いのか（Why）"),
     best_practice STRING NOT NULL OPTIONS(description="Geminiに提案させるべき正しい修正案・定石（How）")
 );
-
 -- 2. マスターデータの投入 (INSERT)
 INSERT INTO `<saas_project_id>.audit_master.antipattern_master` (pattern_name, problem_description, best_practice)
 VALUES

@@ -3,6 +3,8 @@ resource "google_service_account" "analyzer_sa" {
   account_id   = var.service_account_id
   display_name = "Gemini Query Analyzer Service Account"
   project      = var.saas_project_id
+
+  depends_on = [terraform_data.api_completion]
 }
 
 # 3. SaaSプロジェクト側への権限付与

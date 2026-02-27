@@ -59,26 +59,26 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
     ]
   }
 
-  depends_on = [google_project_service.saas_apis]
+  depends_on = [terraform_data.api_completion]
 }
 
-# (おまけ) READMEにあった定期実行スケジューラもコード化
-resource "google_cloud_scheduler_job" "daily_analyzer_trigger" {
-  name        = "daily-analyzer-trigger"
-  description = "Trigger Gemini Query Analyzer Job daily"
-  schedule    = var.scheduler_cron
-  time_zone   = "Asia/Tokyo"
-  project     = var.saas_project_id
-  region      = var.region
+# # (おまけ) READMEにあった定期実行スケジューラもコード化
+# resource "google_cloud_scheduler_job" "daily_analyzer_trigger" {
+#   name        = "daily-analyzer-trigger"
+#   description = "Trigger Gemini Query Analyzer Job daily"
+#   schedule    = var.scheduler_cron
+#   time_zone   = "Asia/Tokyo"
+#   project     = var.saas_project_id
+#   region      = var.region
 
-  http_target {
-    http_method = "POST"
-    uri         = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.saas_project_id}/jobs/${google_cloud_run_v2_job.analyzer_job.name}:run"
+#   http_target {
+#     http_method = "POST"
+#     uri         = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.saas_project_id}/jobs/${google_cloud_run_v2_job.analyzer_job.name}:run"
 
-    oauth_token {
-      service_account_email = google_service_account.analyzer_sa.email
-    }
-  }
+#     oauth_token {
+#       service_account_email = google_service_account.analyzer_sa.email
+#     }
+#   }
 
-  depends_on = [google_project_service.saas_apis]
-}
+#   depends_on = [terraform_data.api_completion]
+# }
