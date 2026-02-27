@@ -64,6 +64,3 @@ QUALIFY
     ROW_NUMBER() OVER(ORDER BY billed_gb DESC) <= {limit}
     OR
     ROW_NUMBER() OVER(ORDER BY duration_seconds DESC) <= {limit};
-    -- ROW_NUMBER() OVER(ORDER BY billed_gb DESC) <= 10
-    -- OR
-    -- ROW_NUMBER() OVER(ORDER BY duration_seconds DESC) <= 10;
