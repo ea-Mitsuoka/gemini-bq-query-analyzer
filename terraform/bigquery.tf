@@ -17,7 +17,7 @@ resource "google_bigquery_job" "init_master_data" {
 
   query {
     # 既存のSQLファイルを読み込んで実行
-    query          = file("${path.module}/../sql/antipattern-list.sql")
+    query          = file("${path.module}/../main-app/sql/antipattern-list.sql")
     use_legacy_sql = false
   }
 
