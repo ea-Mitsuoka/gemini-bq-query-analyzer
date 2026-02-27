@@ -1,4 +1,3 @@
-
 # ローカルソースをアーカイブしてCloud Buildでビルドするリソースの例
 resource "null_resource" "build_api_image" {
   # ソースコードやJARファイルが変更されたら再実行
