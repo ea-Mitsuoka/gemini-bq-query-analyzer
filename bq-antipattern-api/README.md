@@ -69,9 +69,13 @@ Google Cloud SDK (`gcloud`) を使用して、ソースコードから直接Clou
 ```bash
 cd bq-antipattern-api
 
+set -a
+source ../.env
+set +a
+
 gcloud run deploy bq-antipattern-api \
     --source . \
-    --region asia-northeast1 \
+    --region ${REGION} \
     --service-account=${SA_EMAIL} \
     --memory 1Gi \
     --no-allow-unauthenticated

@@ -81,6 +81,7 @@ TIME_RANGE_INTERVAL="1 MONTH"
 # TIME_RANGE_INTERVALを空にして、以下を指定します (形式: YYYY-MM-DD HH:MM:SS)
 # TIME_RANGE_START="2024-01-01 00:00:00"
 # TIME_RANGE_END="2024-01-31 23:59:59"
+REGION="us-central1"
 
 # ---
 # 1. 最優先で適用される（他の設定を上書きする）
@@ -187,8 +188,6 @@ cd main-app
 set -a
 source ../.env
 set +a
-
-export REGION="us-central1" # 任意のリージョン
 
 gcloud run jobs deploy gemini-bq-query-analyzer-job \
     --source . \

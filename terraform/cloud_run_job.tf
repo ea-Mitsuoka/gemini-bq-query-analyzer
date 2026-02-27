@@ -29,8 +29,8 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
           value = var.customer_project_id
         }
         env {
-          name  = google_cloud_run_v2_service.antipattern_api.uri
-          value = var.bq_antipattern_analyzer_url
+          name  = "BQ_ANTIPATTERN_ANALYZER_URL"
+          value = google_cloud_run_v2_service.antipattern_api.uri
         }
         env {
           name  = "SLACK_WEBHOOK_URL"
