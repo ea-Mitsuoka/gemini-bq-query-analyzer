@@ -64,12 +64,12 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
 
 # (おまけ) READMEにあった定期実行スケジューラもコード化
 resource "google_cloud_scheduler_job" "daily_analyzer_trigger" {
-  name             = "daily-analyzer-trigger"
-  description      = "Trigger Gemini Query Analyzer Job daily"
-  schedule         = "0 9 * * *"
-  time_zone        = "Asia/Tokyo"
-  project          = var.saas_project_id
-  region           = var.region
+  name        = "daily-analyzer-trigger"
+  description = "Trigger Gemini Query Analyzer Job daily"
+  schedule    = "0 9 * * *"
+  time_zone   = "Asia/Tokyo"
+  project     = var.saas_project_id
+  region      = var.region
 
   http_target {
     http_method = "POST"

@@ -11,7 +11,7 @@ resource "google_bigquery_dataset" "audit_master" {
 # SQLファイルを読み込んで初期テーブル作成とデータ投入を実行
 resource "google_bigquery_job" "init_master_data" {
   # 実行ID（変更すると再実行されます）
-  job_id   = "init_antipattern_master_v1" 
+  job_id   = "init_antipattern_master_v1"
   project  = var.saas_project_id
   location = var.region
 
