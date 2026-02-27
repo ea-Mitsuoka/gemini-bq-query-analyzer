@@ -23,6 +23,8 @@ resource "google_project_iam_member" "saas_permissions" {
   project  = var.saas_project_id
   role     = each.key
   member   = "serviceAccount:${google_service_account.analyzer_sa.email}"
+
+  depends_on = [google_service_account.analyzer_sa]
 }
 
 # 4. 顧客プロジェクト側への権限付与
@@ -39,4 +41,6 @@ resource "google_project_iam_member" "customer_permissions" {
   project  = var.customer_project_id
   role     = each.key
   member   = "serviceAccount:${google_service_account.analyzer_sa.email}"
+
+  depends_on = [google_service_account.analyzer_sa]
 }

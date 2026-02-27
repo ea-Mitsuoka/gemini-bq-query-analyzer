@@ -1,3 +1,9 @@
+# ビルド完了後に30秒待つリソース
+resource "time_sleep" "wait_30_seconds_after_build" {
+  depends_on      = [null_resource.build_main_app_image]
+  create_duration = "30s"
+}
+
 resource "google_cloud_run_v2_job" "analyzer_job" {
   name     = "gemini-bq-query-analyzer-job"
   location = var.region
@@ -9,8 +15,8 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
       timeout         = "600s"
 
       containers {
-        # 初回構築用のプレースホルダー画像。実際のアプリデプロイはソースコードから行います。
-        image = "us-docker.pkg.dev/cloudrun/container/job:latest"
+        # ビルドした本物のイメージを指定
+        image = "${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/gemini-bq-query-analyzer-job:latest"
 
         resources {
           limits = {
@@ -51,14 +57,24 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
       }
     }
   }
+  # 修正: ビルド直後ではなく、待機が終わってから更新を開始させる
+  depends_on = [time_sleep.wait_30_seconds_after_build]
+}
 
-  lifecycle {
-    # アプリのデプロイによってコンテナイメージが書き換わっても、Terraformで上書きして元に戻さないようにする
-    ignore_changes = [
-      template[0].template[0].containers[0].image
-    ]
+# main-app のビルド
+resource "null_resource" "build_main_app_image" {
+  triggers = {
+    # 関連ファイルの変更を検知
+    src_hash = sha256(join("", [for f in fileset("${path.module}/../main-app", "**") : filesha256("${path.module}/../main-app/${f}")]))
   }
 
+  provisioner "local-exec" {
+    command = <<EOT
+      gcloud builds submit ../main-app \
+        --tag ${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/gemini-bq-query-analyzer-job:latest \
+        --project ${var.saas_project_id}
+    EOT
+  }
   depends_on = [terraform_data.api_completion]
 }
 
