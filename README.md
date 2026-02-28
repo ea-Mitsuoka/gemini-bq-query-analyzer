@@ -46,7 +46,9 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 * 本システムを稼働させるには、SaaSプロジェクト側のBigQueryにアンチパターンの**マスター辞書テーブル**が存在している必要があります。
 `docs/` 配下にあるDDLスクリプトを使用して、事前に `audit_master.antipattern_master` テーブルを作成・データ投入(`antipattern-list.sql`をBigQueryのコンソールで実行)しておいてください。
 * bq-antipattern-apiを事前にデプロイしている必要があります。
+  * JAR ファイルの実在: bq-antipattern-api/ 直下に bigquery-antipattern-recognition.jar が配置されている必要があります 。これが欠けていると、コンテナビルドは成功しても API 実行時に 500 Error になります 。
 * 検査対象の顧客プロジェクトにGCSバケットを作成し、IAMロールを付与していただく必要があります。
+* 置換変数の整合性: gemini_prompt.txt 内で使用する変数（{query} や {billed_gb} など）が、Python コード側で定義した辞書のキーと完全に一致している必要があります 。
 
 ---
 
@@ -67,7 +69,9 @@ pip install -r requirements.txt
 ```bash
 SAAS_PROJECT_ID=your-saas-project-id
 CUSTOMER_PROJECT_ID=target-customer-project-id
-BQ_ANTIPATTERN_ANALYZER_URL=https://bq-antipattern-api-xxxxx.a.run.app # デプロイ済みのbq-antipattern-analyzerのURL
+REGION="us-central1"
+# デプロイ済みのbq-antipattern-analyzerのURL
+BQ_ANTIPATTERN_ANALYZER_URL=https://bq-antipattern-api-xxxxx.a.run.app 
 SLACK_WEBHOOK_URL=your-slack-webhook-url
 GCS_BUCKET_NAME=for-reports-storage
 # 抽出するワーストクエリの最大件数（コスト、実行時間それぞれ）
@@ -81,7 +85,6 @@ TIME_RANGE_INTERVAL="1 MONTH"
 # TIME_RANGE_INTERVALを空にして、以下を指定します (形式: YYYY-MM-DD HH:MM:SS)
 # TIME_RANGE_START="2024-01-01 00:00:00"
 # TIME_RANGE_END="2024-01-31 23:59:59"
-REGION="us-central1"
 
 # ---
 # 1. 最優先で適用される（他の設定を上書きする）
