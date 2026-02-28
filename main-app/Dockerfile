@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir pip==23.3.1 setuptools==68.2.2 && \
 # ディレクトリ単位でコピー
 COPY src/ ./src/
 COPY sql/ ./sql/
+COPY prompts/ ./prompts/
 
 # 非rootユーザーで実行
 RUN useradd -m appuser

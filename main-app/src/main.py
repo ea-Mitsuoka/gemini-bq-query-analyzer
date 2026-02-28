@@ -43,16 +43,16 @@ WORST_QUERY_LIMIT = int(os.getenv("WORST_QUERY_LIMIT", "1"))
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORST_RANKING_SQL_PATH = os.path.join(BASE_DIR, "sql", "worst_ranking.sql")
 STORAGE_ANALYSIS_SQL_PATH = os.path.join(BASE_DIR, "sql", "logical_vs_physical_storage_analysis.sql")
-
+GEMINI_PROMPT_PATH = os.path.join(BASE_DIR, "prompts", "gemini_prompt.txt")
 
 # ==========================================
 # ヘルパー関数群
 # ==========================================
 
-def load_sql_file(filepath):
+def load_external_file(filepath):
     """外部SQLファイルを読み込む"""
     if not os.path.exists(filepath):
-        raise FileNotFoundError(f"SQL file not found: {filepath}")
+        raise FileNotFoundError(f"File not found: {filepath}")
     with open(filepath, "r", encoding="utf-8") as f:
         return f.read()
 
@@ -194,7 +194,7 @@ def get_query_schema_info(client, referenced_tables):
         return "クエリの解析に失敗したため、スキーマ情報を特定できませんでした。"
 
 def analyze_storage_pricing(client, target_project, region, sql_template):
-    """外部SQLからストレージ判定結果を取得しテキスト化する"""
+    """ストレージ料金モデルの判定"""
     try:
         # formatメソッドを使って外部SQLの変数を動的に置換
         formatted_sql = sql_template.format(
@@ -230,7 +230,7 @@ def analyze_storage_pricing(client, target_project, region, sql_template):
 # ==========================================
 
 def load_master_dictionary(client, saas_project_id):
-    """マスター辞書を最初に1回だけDBから読み込み、Pythonの辞書として返す"""
+    """アンチパターンマスターの読み込み"""
     logger.info("Loading anti-pattern master dictionary from BigQuery...")
     master_dict = {}
     query = f"""
@@ -252,7 +252,7 @@ def load_master_dictionary(client, saas_project_id):
         return {}
 
 def extract_relevant_dictionary(master_dict, detected_text):
-    """抽出されたテキストに含まれるKeyだけをメモリ上の辞書から取り出す"""
+    """検出されたアンチパターンのみ抽出"""
     if not detected_text or not master_dict:
         return "特になし"
 
@@ -260,55 +260,29 @@ def extract_relevant_dictionary(master_dict, detected_text):
     return "\n\n".join(relevant_texts) if relevant_texts else "特になし"
 
 def build_gemini_prompt(job, schema_info_text, antipattern_raw_text, master_dict_text):
-    """Geminiへ渡すプロンプト文字列を生成する（責務の分離）"""
-    billed_gb = job.billed_gb if job.billed_gb is not None else 0.0
-    duration_seconds = job.duration_seconds if job.duration_seconds is not None else 0
-    slot_hours = job.slot_hours if job.slot_hours is not None else 0.0
+    """外部ファイルからプロンプトを読み込み、変数を注入する"""
+    try:
+        template = load_external_file(GEMINI_PROMPT_PATH)
+        params = {
+            "billed_gb": job.billed_gb if job.billed_gb is not None else 0.0,
+            "duration_seconds": job.duration_seconds if job.duration_seconds is not None else 0,
+            "slot_hours": job.slot_hours if job.slot_hours is not None else 0.0,
+            "source_type": job.source_type,
+            "difficulty": job.difficulty,
+            "query": job.query,
+            "schema_info_text": schema_info_text,
+            "antipattern_raw_text": antipattern_raw_text,
+            "master_dict_text": master_dict_text
+        }
+        # template.format() を使い、{} プレースホルダに辞書の中身を流し込む
+        return template.format(**params)
 
-    return f"""
-    あなたはBigQueryのコスト最適化エキスパートです。
-    以下のSQLクエリの効率を診断し、改善案を提示してください。
-    SQL以外(Pythonなど)のアプリケーション側の改善案は一切不要です。
-
-    [パフォーマンス指標]
-    - スキャン量(Cost): {billed_gb:.2f} GB
-    - 実行時間(Wait): {duration_seconds} 秒
-    - CPU消費量(Load): {slot_hours:.2f} スロット時間
-      ※CPU消費量が実行時間に比べて著しく大きい場合、非効率なJOINや演算が発生しています。
-
-    [コンテキスト情報]
-    - 実行者タイプ: {job.source_type}
-    - 改善難易度: {job.difficulty}
-
-    [対象SQL]
-    {job.query}
-
-    [参照テーブルのスキーマ情報]
-    {schema_info_text}
-
-    [構文解析ツールによる指摘事項]
-    {antipattern_raw_text}
-
-    [アンチパターンの公式マニュアル（絶対のルール）]
-    {master_dict_text}
-
-    [回答の要件]
-    Markdown形式で見出しを使って簡潔に記述してください。
-    1. **改善対象**: 検査したSQL
-    2. **ボトルネックの特定**: スキャン量が多いのか、CPU消費が多いのかを明示してください。
-    3. **マニュアルの指摘事項の適用**: [構文解析ツールによる指摘事項]が存在する場合、必ず[アンチパターンの公式マニュアル]の「修正の定石」に従って解説してください。AI独自の推測でマニュアルに反する回答をしてはいけません。
-    4. **スキーマの考慮**: [参照テーブルのスキーマ情報]に「パーティション列」が存在するのに、[対象SQL]のWHERE句で使われていない場合は、強く警告して具体的な修正案を出してください。
-    5. **改善SQL**: スキーマ情報とマニュアルの定石をすべて踏まえた、具体的なRewrite案。[構文解析ツールによる指摘事項]が存在しない場合、AIの推測でSQLのどこに問題があるかを特定し、マニュアルのルールと照らし合わせて解説してください。
-    6. **実行者に応じたアドバイス**: {job.source_type}向けに記述。難易度「Low」ならすぐに設定変更を促し、「High」なら次回リリースでの修正を促してください。
-
-    [回答の禁止事項]
-    - SQL以外のアプリケーション側の改善案を提示しないこと
-    - 構文解析ツールの指摘事項がある場合、必ずマニュアルの定石に従って解説すること。AI独自の推測でマニュアルに反する回答をしてはいけません。構文解析ツールの指摘事項があっても、構文解析ツールとは別の問題箇所についてはAIの推測で指摘しても構いません。
-    - SQLの書き方に改善の余地がない場合は、「このSQLはスキャン量、実行時間、CPU消費のいずれも効率的に書かれており、改善の必要はありません。」と明確に回答すること。また、その場合は冗長な文章を避け、簡潔に回答してください。
-    """
+    except Exception as e:
+        logger.error(f"Failed to build prompt from external file: {e}")
+        return f"Analyze this SQL: {job.query}"
 
 def upload_report_to_gcs(bucket_name, report_content, project_id):
-    """マークダウンレポートをGCSにアップロードし、URLを返す"""
+    """Markdown形式のレポートをGCSへアップロード"""
     if not bucket_name:
         logger.warning("GCS_BUCKET_NAME is not set. Skipping GCS upload.")
         return None
@@ -358,9 +332,9 @@ def main():
 
     # 外部SQLファイルのロード
     try:
-        worst_ranking_sql_template = load_sql_file(WORST_RANKING_SQL_PATH)
-        storage_analysis_sql_template = load_sql_file(STORAGE_ANALYSIS_SQL_PATH)
-    except FileNotFoundError as e:
+        worst_ranking_sql_template = load_external_file(WORST_RANKING_SQL_PATH)
+        storage_analysis_sql_template = load_external_file(STORAGE_ANALYSIS_SQL_PATH)
+    except Exception as e:
         logger.error(f"SQL file loading error: {e}")
         return
 
@@ -414,7 +388,7 @@ def main():
             query_job = bq_client.query(formatted_sql, location=region)
             all_jobs.extend(list(query_job.result()))
         except Exception as e:
-            logger.error(f"Error or Skip in {region}: {e}")
+            logger.error(f"Error in {region}: {e}")
 
     # 2. プロジェクト全体でのワーストクエリに絞り込む
     job_ranks = {}
@@ -474,7 +448,7 @@ def main():
         antipattern_raw_text = analyze_with_bq_antipattern_analyzer(job.query)
         # メモリ上の辞書から必要なルールだけを即座に抽出
         master_dict_text = extract_relevant_dictionary(master_dict, antipattern_raw_text)
-        # Geminiへのプロンプト生成
+        # Geminiへのプロンプト生成(外部ファイルの読み込みと変数注入)
         prompt = build_gemini_prompt(job, schema_info_text, antipattern_raw_text, master_dict_text)
 
         try:
