@@ -17,7 +17,12 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
       containers {
         # ビルドした本物のイメージを指定
         image = "${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/gemini-bq-query-analyzer-job:latest"
-
+        # 環境変数にハッシュ値を埋め込む
+        # これにより、ファイルが変われば環境変数が変わり、Job の「更新」が検知されます
+        env {
+          name  = "SOURCE_CODE_HASH"
+          value = null_resource.build_main_app_image.triggers.src_hash
+        }
         resources {
           limits = {
             cpu    = "1000m"
