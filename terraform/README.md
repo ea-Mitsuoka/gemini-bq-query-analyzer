@@ -4,11 +4,13 @@
 
 1. **JARファイルが配置されていること**: `bq-antipattern-api/` 直下に `bigquery-antipattern-recognition.jar` が実在すること 。
 
-2. **gcloudが認証済みであること**: Terraformを実行する環境（PCやCI/CD）で `gcloud auth login` が済んでおり、`saas_project_id` に対して Cloud Build を実行する権限があること。
+1. **gcloudが認証済みであること**: Terraformを実行する環境（PCやCI/CD）で `gcloud auth login` が済んでおり、`saas_project_id` に対して Cloud Build を実行する権限があること。
 
-3. **APIが有効であること**: `api.tf` で `cloudbuild.googleapis.com` が有効化されていること 。
+1. **APIが有効であること**: `api.tf` で `cloudbuild.googleapis.com` が有効化されていること 。
 
-4. **Artifact Registry / GCR の有効化**: プロジェクトで `containerregistry.googleapis.com` (GCR) または `artifactregistry.googleapis.com` が有効であること。
+1. **Artifact Registry / GCR の有効化**: プロジェクトで `containerregistry.googleapis.com` (GCR) または `artifactregistry.googleapis.com` が有効であること。
+
+1. **terraform 実行者のアカウントに必要なロール**: 顧客プロジェクトで`Project IAM 管理者 (roles/resourcemanager.projectIamAdmin)`のロールを持っていること。
 
 ## 🚀 この構成のメリット
 

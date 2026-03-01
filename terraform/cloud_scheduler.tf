@@ -1,7 +1,7 @@
 resource "google_cloud_scheduler_job" "tenant_schedulers" {
   for_each = var.tenants
 
-  name     = "analyzer-scheduler-${each.key}"
+  name     = "gemini-bq-query-analyzer-scheduler-${each.key}"
   schedule = each.value.scheduler_cron
   project  = var.saas_project_id
   region   = var.region

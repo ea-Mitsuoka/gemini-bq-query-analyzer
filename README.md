@@ -267,3 +267,5 @@ gcloud run jobs update gemini-bq-query-analyzer-job \
 
 Pythonコード（`main-app/src/main.py` 等）内での環境変数の読み込みは、引数なしの `load_dotenv()` を使用しています。
 これは `python-dotenv` ライブラリの仕様（親ディレクトリに向かって `.env` を自動探索する `find_dotenv()` の挙動）を利用したものです。これにより、コード内に絶対パスや相対パスをハードコードすることなく、高い可読性を維持したままルートの `.env` を安全に読み込んでいます。
+
+`terraform destroy`をするときは、顧客プロジェクトのバケットの中身を空にして、SaaSプロジェクトのmasterテーブルを削除する
