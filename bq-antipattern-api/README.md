@@ -1,4 +1,4 @@
-# BigQuery Anti-pattern Analyzer API
+# BigQuery Antipattern API
 
 ## 📌 概要
 `bq-antipattern-api` は、Google Cloud 公式のOSSツールである [bigquery-antipattern-recognition](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition) をラップし、REST APIとして提供するマイクロサービスです。
