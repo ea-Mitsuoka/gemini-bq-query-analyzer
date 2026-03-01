@@ -23,7 +23,7 @@ def generate_tfvars(
     common_vars = {}
     tenants_data = {}
 
-    # 1. 共通設定の抽出 (SAAS_PROJECT_ID, REGION, BQ_ANTIPATTERN_ANALYZER_URL)
+    # 1. 共通設定の抽出 (SAAS_PROJECT_ID, REGION, BQ_ANTIPATTERN_API_URL)
     # 単純な key="value" 形式を正規表現で探す
     simple_vars = re.findall(r'^([A-Z_]+)\s*=\s*["\']?([^"\']+)["\']?', content, re.MULTILINE)
     for key, value in simple_vars:

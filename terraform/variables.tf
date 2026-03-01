@@ -7,7 +7,7 @@ variable "region" {
   default = "us-central1"
 }
 
-variable "bq_antipattern_analyzer_url" {
+variable "bq_antipattern_api_url" {
   type = string
 }
 

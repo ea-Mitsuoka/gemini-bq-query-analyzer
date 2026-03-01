@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 SAAS_PROJECT_ID = os.getenv("SAAS_PROJECT_ID")
 CUSTOMER_PROJECT_ID = os.getenv("CUSTOMER_PROJECT_ID")
-BQ_ANTIPATTERN_ANALYZER_URL = os.getenv("BQ_ANTIPATTERN_ANALYZER_URL")
+BQ_ANTIPATTERN_API_URL = os.getenv("BQ_ANTIPATTERN_API_URL")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
 LOCATION = "us-central1"        # Vertex AIのリージョン
 # 調査期間の環境変数を取得
@@ -111,17 +111,17 @@ def get_oidc_token(audience):
         credentials.refresh(auth_req)
         return credentials.id_token
 
-def analyze_with_bq_antipattern_analyzer(query_string):
+def analyze_with_bq_antipattern_api(query_string):
     """構文解析APIを呼び出す。トークンはキャッシュを利用。"""
-    if not BQ_ANTIPATTERN_ANALYZER_URL:
-        logger.warning("BQ_ANTIPATTERN_ANALYZER_URL is not set. Skipping analyzer API call.")
+    if not BQ_ANTIPATTERN_API_URL:
+        logger.warning("BQ_ANTIPATTERN_API_URL is not set. Skipping API call.")
         return "API URL未設定のため解析をスキップしました。"
 
-    endpoint = f"{BQ_ANTIPATTERN_ANALYZER_URL.rstrip('/')}/analyze"
+    endpoint = f"{BQ_ANTIPATTERN_API_URL.rstrip('/')}/analyze"
 
     try:
         # キャッシュされた関数からトークンを取得
-        id_token = get_oidc_token(BQ_ANTIPATTERN_ANALYZER_URL)
+        id_token = get_oidc_token(BQ_ANTIPATTERN_API_URL)
 
         headers = {"Authorization": f"Bearer {id_token}", "Content-Type": "application/json"}
         response = requests.post(endpoint, json={"query": query_string}, headers=headers, timeout=60)
@@ -130,7 +130,7 @@ def analyze_with_bq_antipattern_analyzer(query_string):
         return response.json().get("recommendations", "")
 
     except Exception as e:
-        logger.error(f"bq-antipattern-analyzer API call failed: {e}")
+        logger.error(f"bq-antipattern-api API call failed: {e}")
         return "アンチパターンの解析ツール呼び出しに失敗しました。"
 
 def get_query_schema_info(client, referenced_tables):
@@ -438,7 +438,7 @@ def main():
         # スキーマ情報の取得 (ドライランの代わりにジョブ履歴の referenced_tables を渡す)
         schema_info_text = get_query_schema_info(bq_client, getattr(job, "referenced_tables", []))
         # 構文解析ツールの呼び出し
-        antipattern_raw_text = analyze_with_bq_antipattern_analyzer(job.query)
+        antipattern_raw_text = analyze_with_bq_antipattern_api(job.query)
         # メモリ上の辞書から必要なルールだけを即座に抽出
         master_dict_text = extract_relevant_dictionary(master_dict, antipattern_raw_text)
         # Geminiへのプロンプト生成(外部ファイルの読み込みと変数注入)

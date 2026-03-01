@@ -28,7 +28,7 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
           value = var.saas_project_id
         }
         env {
-          name  = "BQ_ANTIPATTERN_ANALYZER_URL"
+          name  = "BQ_ANTIPATTERN_API_URL"
           value = google_cloud_run_v2_service.antipattern_api.uri
         }
 

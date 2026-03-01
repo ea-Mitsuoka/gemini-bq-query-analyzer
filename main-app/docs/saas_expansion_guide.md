@@ -106,7 +106,7 @@ print("✅ terraform.tfvars has been generated successfully!")
 ```hcl
 variable "saas_project_id" { type = string }
 variable "region" { type = string, default = "us-central1" }
-variable "bq_antipattern_analyzer_url" { type = string }
+variable "bq_antipattern_api_url" { type = string }
 
 # 顧客のリストを受け取る変数
 variable "customers" {
@@ -144,7 +144,7 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
         image = "us-docker.pkg.dev/cloudrun/container/job:latest"
         
         env { name = "SAAS_PROJECT_ID", value = var.saas_project_id }
-        env { name = "BQ_ANTIPATTERN_ANALYZER_URL", value = var.bq_antipattern_analyzer_url }
+        env { name = "BQ_ANTIPATTERN_API_URL", value = var.bq_antipattern_api_url }
         # 顧客固有の設定を注入
         env { name = "CUSTOMER_PROJECT_ID", value = each.value.customer_project_id }
         env { name = "SLACK_WEBHOOK_URL", value = each.value.slack_webhook_url }
