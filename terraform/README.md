@@ -76,7 +76,12 @@ TENANTS_JSON='{
 
 ### 2-4. gcloudで認証
 
-Terraformを実行する環境（PCやCI/CD）で `gcloud auth login` を実行
+Terraformを実行する環境（PCやCI/CD）でコマンドを実行
+
+```bash
+gcloud auth login
+gcloud auth application-default login
+```
 
 ### 2-2. terraform apply
 
