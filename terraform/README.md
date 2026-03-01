@@ -89,4 +89,3 @@ terraform apply
 
 * **完全自動化**: `terraform apply` を叩くだけで、ソースコードのアップロード、ビルド、イメージ作成、Cloud Runへの反映が一気通貫で行われます。
 * **賢い再ビルド**: `sha256` によるトリガーを設定したため、`app.py` や JAR ファイルを書き換えたときだけビルドが走り、変更がないときはスキップされるので高速です。
-* **URLの自動連携**: `cloud_run_job.tf` 側で `value = google_cloud_run_v2_service.antipattern_api.uri` と記述していれば、ビルドされたAPIのURLが自動的にメインアプリに渡されます 。
