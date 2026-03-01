@@ -24,9 +24,9 @@ resource "google_storage_bucket" "customer_reports" {
 # バケット用のランダムな接尾辞
 resource "random_string" "suffix" {
   for_each = var.tenants
-  length  = 4
-  special = false
-  upper   = false
+  length   = 4
+  special  = false
+  upper    = false
 }
 
 # 作成したバケットに対してサービスアカウントに権限を付与

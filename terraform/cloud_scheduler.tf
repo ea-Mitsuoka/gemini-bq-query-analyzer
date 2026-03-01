@@ -1,10 +1,10 @@
 resource "google_cloud_scheduler_job" "tenant_schedulers" {
   for_each = var.tenants
 
-  name        = "analyzer-scheduler-${each.key}"
-  schedule    = each.value.scheduler_cron
-  project     = var.saas_project_id
-  region      = var.region
+  name     = "analyzer-scheduler-${each.key}"
+  schedule = each.value.scheduler_cron
+  project  = var.saas_project_id
+  region   = var.region
 
   http_target {
     http_method = "POST"

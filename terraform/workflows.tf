@@ -6,9 +6,9 @@ resource "google_workflows_workflow" "analyzer_workflow" {
 
   # 外部のYAMLファイルを読み込む
   source_contents = templatefile("${path.module}/../workflows/analyzer_workflow.yaml", {
-    project_id   = var.saas_project_id
-    region       = var.region
-    job_name     = google_cloud_run_v2_job.analyzer_job.name
+    project_id = var.saas_project_id
+    region     = var.region
+    job_name   = google_cloud_run_v2_job.analyzer_job.name
     # その他、Workflow内で使いたい変数を注入可能
   })
 
