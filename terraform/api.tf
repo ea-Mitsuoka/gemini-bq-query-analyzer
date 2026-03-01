@@ -7,7 +7,8 @@ locals {
     "cloudscheduler.googleapis.com",
     "iam.googleapis.com",
     "storage.googleapis.com",
-    "workflows.googleapis.com"
+    "workflows.googleapis.com",
+    "artifactregistry.googleapis.com"
   ]
 }
 
