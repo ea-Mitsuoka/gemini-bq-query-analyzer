@@ -6,7 +6,8 @@ locals {
     "bigquery.googleapis.com",
     "cloudscheduler.googleapis.com",
     "iam.googleapis.com",
-    "storage.googleapis.com"
+    "storage.googleapis.com",
+    "workflows.googleapis.com"
   ]
 }
 

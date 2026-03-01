@@ -14,6 +14,9 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 │   ├── variables.tf
 │   └── ...
 │
+├── workflows/             # 🆕 Workflowの定義ファイルを格納する専用ディレクトリ
+│   └── analyzer_workflow.yaml # 🆕 実際の実行フロー（YAML）
+│
 ├── main-app/             # 🔍 メインの監査ツール（Cloud Run Job）
 │   ├── src/
 │   │   └── main.py       # （現在のメインスクリプト）
@@ -166,7 +169,6 @@ done
 CUSTOMER_ROLES=(
     "roles/bigquery.metadataViewer"
     "roles/bigquery.resourceViewer"
-    "roles/storage.objectCreator"
 )
 # "roles/bigquery.metadataViewer" # BigQuery メタデータ閲覧者（各テーブルのスキーマやパーティション構成を取得するため）
 # "roles/bigquery.resourceViewer" # BigQuery リソース閲覧者（INFORMATION_SCHEMA.JOBS からプロジェクト全体のクエリ履歴を取得するため）
@@ -181,6 +183,16 @@ for ROLE in ${CUSTOMER_ROLES[@]}; do
         --role="$ROLE" \
         --condition=None
 done
+```
+
+1. 顧客プロジェクトにレポート保存用のバケット作成
+
+```bash
+# バケット作成
+gcloud storage buckets create gs://[BUCKET_NAME] --project=[CUSTOMER_PROJECT_ID] --location=us-central1
+# 権限付与
+gcloud storage buckets add-iam-policy-binding gs://[BUCKET_NAME] \
+    --member="serviceAccount:[SA_EMAIL]" --role="roles/storage.objectAdmin"
 ```
 
 1. Cloud Run Jobsの作成（gcr.ioは非推奨のためソースコードから直接）
@@ -212,16 +224,26 @@ gcloud run jobs deploy gemini-bq-query-analyzer-job \
 
 ```bash
 gcloud run jobs execute gemini-bq-query-analyzer-job --region $REGION
+
+# Cloud Schedulerをterraformで作成した場合、Workflowから環境変数を書き換える設定をする事を前提としているため gcloudコマンドやCloud Run Jobを強制実行したらエラーになる. Cloud Schedulerによる実行ならOK
+gcloud scheduler jobs run gemini-bq-query-analyzer-job --location $REGION
 ```
 
-1. スケジューラーの設定
+1. workflowsの設定
 
 ```bash
-gcloud scheduler jobs create http daily-analyzer-trigger \
+
+```
+
+1. スケジューラーの設定(コマンドは要検証)
+
+```bash
+gcloud scheduler jobs create http gemini-bq-query-analyzer-trigger \
     --location $REGION \
-    --schedule "0 9 * * *" \
-    --uri "https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$(gcloud config get-value project)/jobs/gemini-bq-query-analyzer-job:run" \
-    --http-method POST \
+    --schedule ${SCHEDULER_CRON} \
+    --time-zone="Asia/Tokyo" \
+    --uri "https://workflowexecutions.googleapis.com/v1/projects/${SAAS_PROJECT_ID}/locations/${REGION}/workflows/${ANALYZER_WORKFLOW}/executions" \
+    --message-body='{"slack_webhook_url": "https://hooks.slack.com/services/T00/B00/XXXX", "customer_id": "tenant-a"}' \
     --oauth-service-account-email "${SA_EMAIL}"
 ```
 

@@ -30,14 +30,13 @@ load_dotenv()
 SAAS_PROJECT_ID = os.getenv("SAAS_PROJECT_ID")
 CUSTOMER_PROJECT_ID = os.getenv("CUSTOMER_PROJECT_ID")
 BQ_ANTIPATTERN_ANALYZER_URL = os.getenv("BQ_ANTIPATTERN_ANALYZER_URL")
-SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
 LOCATION = "us-central1"        # Vertex AIのリージョン
 # 調査期間の環境変数を取得
-TIME_RANGE_INTERVAL = os.getenv("TIME_RANGE_INTERVAL")
+TIME_RANGE_INTERVAL = os.getenv("TIME_RANGE_INTERVAL", "1 DAY")
 TIME_RANGE_START = os.getenv("TIME_RANGE_START")
 TIME_RANGE_END = os.getenv("TIME_RANGE_END")
-# 抽出するワーストクエリの件数を取得（デフォルトは1）
+# 抽出するワーストクエリの件数を取得
 WORST_QUERY_LIMIT = int(os.getenv("WORST_QUERY_LIMIT", "1"))
 # ファイルパスの設定
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -88,10 +87,7 @@ def get_time_range_expressions():
         end_time_expr = ""
     elif TIME_RANGE_START:
         start_time_expr = f"TIMESTAMP('{TIME_RANGE_START}')"
-        if TIME_RANGE_END:
-            end_time_expr = f"AND creation_time <= TIMESTAMP('{TIME_RANGE_END}')"
-        else:
-            end_time_expr = ""
+        end_time_expr = f"AND creation_time <= TIMESTAMP('{TIME_RANGE_END}')" if TIME_RANGE_END else ""
     else:
         # デフォルト設定 (1日前)
         start_time_expr = "TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)"
@@ -127,10 +123,7 @@ def analyze_with_bq_antipattern_analyzer(query_string):
         # キャッシュされた関数からトークンを取得
         id_token = get_oidc_token(BQ_ANTIPATTERN_ANALYZER_URL)
 
-        headers = {
-            "Authorization": f"Bearer {id_token}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Authorization": f"Bearer {id_token}", "Content-Type": "application/json"}
         response = requests.post(endpoint, json={"query": query_string}, headers=headers, timeout=60)
         response.raise_for_status()
 
@@ -303,23 +296,28 @@ def upload_report_to_gcs(bucket_name, report_content, project_id):
         logger.error(f"Failed to upload report to GCS: {e}")
         return None
 
-def send_to_slack(text):
-    """Slackへメッセージを送信する"""
-    if not SLACK_WEBHOOK_URL:
-        logger.warning("SLACK_WEBHOOK_URL is not set. Skipping Slack notification.")
-        return
+def save_summary_for_workflow(bucket_name, text_summary, customer_project_id):
+    """Workflowが読み取れるようにサマリーをJSON保存する"""
+    if not bucket_name: return
     try:
-        response = requests.post(SLACK_WEBHOOK_URL, json={"text": text}, timeout=10)
-        response.raise_for_status()
+        storage_client = storage.Client(project=customer_project_id)
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob("results/summary.json")
+        import json
+        data = {"text_summary": text_summary, "timestamp": str(datetime.datetime.now())}
+        blob.upload_from_string(json.dumps(data, ensure_ascii=False), content_type="application/json")
+        logger.info("Summary saved for Workflow.")
     except Exception as e:
-        logger.error(f"Failed to send message to Slack: {e}")
-
+        logger.error(f"Failed to save summary: {e}")
 
 # ==========================================
 # メインプロセス
 # ==========================================
 
 def main():
+    if not CUSTOMER_PROJECT_ID:
+        logger.error("CUSTOMER_PROJECT_ID is empty. Please run this job via Workflow with overrides.")
+        return
     if not SAAS_PROJECT_ID or not CUSTOMER_PROJECT_ID:
         logger.error("Environment variables SAAS_PROJECT_ID or CUSTOMER_PROJECT_ID are not set.")
         return
@@ -390,29 +388,20 @@ def main():
         except Exception as e:
             logger.error(f"Error in {region}: {e}")
 
-    # 2. プロジェクト全体でのワーストクエリに絞り込む
+    # 2. ランキングと重複排除
     job_ranks = {}
     if all_jobs:
-        # --- 全体の順位を計算して保存 ---
-        full_sorted_by_billed = sorted(all_jobs, key=lambda x: x.billed_gb or 0.0, reverse=True)
-        full_sorted_by_duration = sorted(all_jobs, key=lambda x: x.duration_seconds or 0, reverse=True)
-        for rank, j in enumerate(full_sorted_by_billed, 1):
-            if j.job_id not in job_ranks:
-                job_ranks[j.job_id] = {}
+        sorted_billed = sorted(all_jobs, key=lambda x: x.billed_gb or 0.0, reverse=True)
+        sorted_duration = sorted(all_jobs, key=lambda x: x.duration_seconds or 0, reverse=True)
+        for rank, j in enumerate(sorted_billed, 1):
+            if j.job_id not in job_ranks: job_ranks[j.job_id] = {}
             job_ranks[j.job_id]['cost_rank'] = rank
-        for rank, j in enumerate(full_sorted_by_duration, 1):
+        for rank, j in enumerate(sorted_duration, 1):
             job_ranks[j.job_id]['duration_rank'] = rank
-        # ------------------------------
 
-        # スキャン容量と実行時間の両方でワーストなクエリをそれぞれ抽出
-        worst_by_billed = sorted(all_jobs, key=lambda x: x.billed_gb or 0.0, reverse=True)[:WORST_QUERY_LIMIT]
-        worst_by_duration = sorted(all_jobs, key=lambda x: x.duration_seconds or 0, reverse=True)[:WORST_QUERY_LIMIT]
-
-        # job_idをキーにして重複を排除しつつ結合
-        final_worst_jobs = {}
-        for job in worst_by_billed + worst_by_duration:
-            final_worst_jobs[job.job_id] = job
-
+        worst_by_billed = sorted_billed[:WORST_QUERY_LIMIT]
+        worst_by_duration = sorted_duration[:WORST_QUERY_LIMIT]
+        final_worst_jobs = {job.job_id: job for job in (worst_by_billed + worst_by_duration)}
         all_jobs = list(final_worst_jobs.values())
         logger.info(f"Filtered down to project-wide worst queries: {len(all_jobs)} queries.")
 
@@ -430,8 +419,12 @@ def main():
         report_lines.append("対象のワーストクエリは見つかりませんでした。\n")
         final_report = "\n".join(report_lines)
         gcs_url = upload_report_to_gcs(GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID)
-        if gcs_url:
-            send_to_slack(f"✅ *本日の BigQuery 監査レポートが完了しました。*\n詳細なレポート（Markdown）はこちらのリンクから確認できます:\n{gcs_url}")
+        message = (
+            "解析が完了しました。対象のワーストクエリは見つかりませんでした。"
+            if gcs_url else
+            "解析は完了しましたが、レポートの保存に失敗しました。"
+        )
+        save_summary_for_workflow(GCS_BUCKET_NAME, message, CUSTOMER_PROJECT_ID)
         return
 
     # 5. 各ワーストクエリの解析
@@ -473,9 +466,9 @@ def main():
     gcs_url = upload_report_to_gcs(GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID)
 
     if gcs_url:
-        send_to_slack(f"✅ *本日の BigQuery 監査レポートが完了しました。*\n詳細なレポート（Markdown）はこちらのリンクから確認できます:\n{gcs_url}")
+        save_summary_for_workflow(GCS_BUCKET_NAME, "解析が完了しました。詳細はGCSのレポートを確認してください。", CUSTOMER_PROJECT_ID)
     else:
-        send_to_slack("✅ *本日の BigQuery 監査レポートが完了しました。*\n(※GCSへの保存に失敗したか、バケットが未設定です)")
+        save_summary_for_workflow(GCS_BUCKET_NAME, "解析が完了しましたが、レポートの保存に失敗しました。", CUSTOMER_PROJECT_ID)
 
 if __name__ == "__main__":
     main()

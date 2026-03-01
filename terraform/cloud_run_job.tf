@@ -15,61 +15,51 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
       timeout         = "600s"
 
       containers {
-        # ビルドした本物のイメージを指定
         image = "${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/gemini-bq-query-analyzer-job:latest"
-        # 環境変数にハッシュ値を埋め込む
-        # これにより、ファイルが変われば環境変数が変わり、Job の「更新」が検知されます
+
         env {
           name  = "SOURCE_CODE_HASH"
           value = null_resource.build_main_app_image.triggers.src_hash
         }
-        resources {
-          limits = {
-            cpu    = "1000m"
-            memory = "512Mi"
-          }
-        }
 
-        # 環境変数の注入
+        # 共通環境変数
         env {
           name  = "SAAS_PROJECT_ID"
           value = var.saas_project_id
         }
         env {
-          name  = "CUSTOMER_PROJECT_ID"
-          value = var.customer_project_id
-        }
-        env {
           name  = "BQ_ANTIPATTERN_ANALYZER_URL"
           value = google_cloud_run_v2_service.antipattern_api.uri
         }
+
+        # 以下の環境変数は Workflow 実行時の Overrides によって動的に決定されるが、
+        # 定義自体は必要なのでプレースホルダーを置いておく
         env {
-          name  = "SLACK_WEBHOOK_URL"
-          value = var.slack_webhook_url
+          name  = "CUSTOMER_PROJECT_ID"
+          value = ""
         }
         env {
           name  = "GCS_BUCKET_NAME"
-          value = var.gcs_bucket_name
+          value = ""
         }
         env {
           name  = "TIME_RANGE_INTERVAL"
-          value = var.time_range_interval
+          value = ""
         }
         env {
           name  = "WORST_QUERY_LIMIT"
-          value = var.worst_query_limit
+          value = ""
         }
+        # Slack通知はWorkflowが行うため、Job側のSLACK_WEBHOOK_URLは不要になります
       }
     }
   }
-  # 修正: ビルド直後ではなく、待機が終わってから更新を開始させる
   depends_on = [time_sleep.wait_30_seconds_after_build]
 }
 
-# main-app のビルド
+# main-app のビルド（共通）
 resource "null_resource" "build_main_app_image" {
   triggers = {
-    # 関連ファイルの変更を検知
     src_hash = sha256(join("", [for f in fileset("${path.module}/../main-app", "**") : filesha256("${path.module}/../main-app/${f}")]))
   }
 
@@ -82,24 +72,3 @@ resource "null_resource" "build_main_app_image" {
   }
   depends_on = [terraform_data.api_completion]
 }
-
-# # (おまけ) READMEにあった定期実行スケジューラもコード化
-# resource "google_cloud_scheduler_job" "daily_analyzer_trigger" {
-#   name        = "daily-analyzer-trigger"
-#   description = "Trigger Gemini Query Analyzer Job daily"
-#   schedule    = var.scheduler_cron
-#   time_zone   = "Asia/Tokyo"
-#   project     = var.saas_project_id
-#   region      = var.region
-
-#   http_target {
-#     http_method = "POST"
-#     uri         = "https://${var.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${var.saas_project_id}/jobs/${google_cloud_run_v2_job.analyzer_job.name}:run"
-
-#     oauth_token {
-#       service_account_email = google_service_account.analyzer_sa.email
-#     }
-#   }
-
-#   depends_on = [terraform_data.api_completion]
-# }

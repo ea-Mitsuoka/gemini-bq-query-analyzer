@@ -1,0 +1,66 @@
+main:
+  params: [event]
+  steps:
+    - debug_log:
+        call: sys.log
+        args:
+          data: $${event}
+    - init:
+        assign:
+          - arg: $${event}
+          - project_id: $${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
+          - region: "us-central1"
+          - job_name: "gemini-bq-query-analyzer-job"
+    - run_job:
+        call: googleapis.run.v2.projects.locations.jobs.run
+        args:
+          name: $${"projects/" + project_id + "/locations/" + region + "/jobs/" + job_name}
+          body:
+            overrides:
+              containerOverrides:
+                - env:
+                    - name: CUSTOMER_PROJECT_ID
+                      value: $${arg.customer_project_id}
+                    - name: GCS_BUCKET_NAME
+                      value: $${arg.gcs_bucket_name}
+                    - name: WORST_QUERY_LIMIT
+                      value: $${arg.worst_query_limit}
+                    - name: TIME_RANGE_INTERVAL
+                      value: $${arg.time_range_interval}
+        result: job_execution
+    - wait_for_job:
+        call: googleapis.run.v2.projects.locations.jobs.executions.get
+        args:
+          name: $${job_execution.name}
+        result: execution_status
+    - check_condition:
+        switch:
+          - condition: $${not(default(execution_status.done, false))}
+            next: sleep_and_poll
+        next: get_report_json
+    - sleep_and_poll:
+        call: sys.sleep
+        args:
+          seconds: 30
+        next: wait_for_job
+    - get_report_json:
+        try:
+          call: http.get
+          args:
+            url: $${"https://storage.googleapis.com/download/storage/v1/b/" + arg.gcs_bucket_name + "/o/results%2Fsummary.json?alt=media"}
+            auth:
+              type: OAuth2
+          result: report_json
+        retry:
+          predicate: $${http.default_retry_predicate}
+          max_retries: 5
+          backoff:
+            initial_delay: 2
+            max_delay: 10
+            multiplier: 2
+    - notify_slack:
+        call: http.post
+        args:
+          url: $${arg.slack_webhook_url}
+          body:
+            text: $${"✅ BQ分析完了 [" + arg.customer_id + "]\n" + report_json.text_summary}
