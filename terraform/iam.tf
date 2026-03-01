@@ -15,8 +15,7 @@ locals {
     "roles/bigquery.dataViewer",
     "roles/workflows.invoker",
     "roles/run.developer",
-    "roles/logging.logWriter",
-    "roles/storage.objectViewer"
+    "roles/logging.logWriter"
   ]
 }
 
