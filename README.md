@@ -296,7 +296,7 @@ gcloud workflows deploy gemini-bq-query-analyzer-workflow \
     --service-account=${SA_EMAIL}
 ```
 
-### 10. スケジューラーの設定(コマンドは要検証)
+### 10. スケジューラーの設定
 
 ```bash
 # jqを使用してテナントごとにループ実行
