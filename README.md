@@ -347,4 +347,6 @@ done
   * ローカル開発用の `.env` ファイルは各アプリケーションのディレクトリ内ではなく、**プロジェクトのルートディレクトリに1つだけ配置**し、全アプリケーションで共有する運用としています。
 
 * `terraform destroy`
-  * 顧客プロジェクトのバケットの中身を空にして、SaaSプロジェクトのmasterテーブルを削除(`bq rm -r -f -d ea-agentspacepj:audit_master`)する
+  * `terraform destroy`を成功させるには、事前に以下の２点を済ませておく必要がある
+    * 顧客プロジェクトのバケットの中身を空にする
+    * SaaSプロジェクトのmasterテーブルを削除(`bq rm -r -f -d ea-agentspacepj:audit_master`)する
