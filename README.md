@@ -12,6 +12,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 ├── terraform/                    # インフラ定義
 │   ├── main.tf
 │   ├── variables.tf
+│   ├── terraform.tfvars          # terraform環境変数（Git除外）
 │   └── ...
 │
 ├── workflows/                    # Workflowの定義ファイルを格納する専用ディレクトリ
@@ -75,19 +76,17 @@ WORST_QUERY_LIMIT=1
 # パターン1: 相対指定で期間を決める場合 (優先)
 + # 例: "1 DAY", "7 DAY", "30 DAY", "12 HOUR" などを指定します。
 TIME_RANGE_INTERVAL="1 DAY"
+
 # パターン2: 絶対時間で期間を決める場合
 # TIME_RANGE_INTERVALを空にして、以下を指定します (形式: YYYY-MM-DD HH:MM:SS)
 # TIME_RANGE_START="2024-01-01 00:00:00"
 # TIME_RANGE_END="2024-01-31 23:59:59"
-
 # ---
 # 1. 最優先で適用される（他の設定を上書きする）
 # - コードの一番最初（if TIME_RANGE_INTERVAL:）で判定されているため、この変数に値が入っている場合は、仮に .env で TIME_RANGE_START や TIME_RANGE_END が設定されていたとしても、それらはすべて無視されます。
-
 # 2. 開始時刻（start_time_expr）の計算
 # - SQLの TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ○○) という関数を使って開始時刻を作ります。
 # - これは「プログラムを実行した現在時刻（CURRENT_TIMESTAMP()）から、指定された期間（TIME_RANGE_INTERVAL）を引き算する」という処理です。
-
 # 3. 終了時刻（end_time_expr）は「現在まで」になる
 # - end_time_expr = "" と空文字（カラ）に設定されます。
 # - これにより、後続のSQL組み立て部分で上限（終了日時）の条件が追加されなくなります。上限がないということは、開始時刻から**「最新のクエリ（現在時刻）」まですべて**が調査対象になります。
@@ -134,7 +133,7 @@ gcloud iam service-accounts create ${SA_NAME} \
     --project=${SAAS_PROJECT_ID}
 ```
 
-### 3. IAMロールの設定
+### 3. SaaSプロジェクトにIAMロールの設定
 
 ```bash
 # ==========================================
@@ -165,7 +164,15 @@ for ROLE in ${SAAS_ROLES[@]}; do
         --role="$ROLE" \
         --condition=None
 done
+```
 
+### 4. bq-antipattern-apiのデプロイ
+
+詳細は`bq-antipattern-api/README.md`を確認する
+
+### 5. bq-antipattern-apiのURLを取得
+
+```bash
 # デプロイされたURLを環境変数に格納（後続のJob作成で使用）
 BQ_ANTIPATTERN_API_URL=$(
   gcloud run services describe bq-antipattern-api \
@@ -177,18 +184,18 @@ BQ_ANTIPATTERN_API_URL=$(
 echo "API URL: ${BQ_ANTIPATTERN_API_URL}"
 ```
 
-### 4. masterデータセット作成 & masterデータ投入
+### 6. masterデータセット作成 & masterデータ投入
 
 ```bash
 # データセットの作成
 bq mk --location=${REGION} --project_id=${SAAS_PROJECT_ID} audit_master
 
 # テーブル作成とデータ投入 (SQL内のプレースホルダーを置換して実行)
-sed "s/<saas_project_id>/${SAAS_PROJECT_ID}/g" sql/antipattern-list.sql | \
+sed "s/<saas_project_id>/${SAAS_PROJECT_ID}/g" main-app/sql/antipattern-list.sql | \
 bq query --use_legacy_sql=false --project_id=${SAAS_PROJECT_ID}
 ```
 
-### 5. 顧客プロジェクトにIAMロール付与 & レポート保存用のバケット作成
+### 7. 顧客プロジェクトにIAMロール付与 & レポート保存用のバケット作成
 
 ```bash
 # ==========================================
@@ -204,6 +211,22 @@ for ROLE in ${CUSTOMER_ROLES[@]}; do
     echo $ROLE
 done
 
+
+# 2. jq を使ってテナントのキー（pacific-legend, datatechlab）のリストを取得しループ
+for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
+
+    # 3. 各テナントの詳細情報を取得
+    CUSTOMER_PROJECT_ID=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".customer_project_id")
+
+    # 5. IAMロールを付与
+    for ROLE in ${CUSTOMER_ROLES[@]}; do
+        gcloud projects add-iam-policy-binding $CUSTOMER_PROJECT_ID \
+            --member="serviceAccount:${SA_EMAIL}" \
+            --role="$ROLE" \
+            --condition=None
+    done
+done
+
 # 2. jq を使ってテナントのキー（pacific-legend, datatechlab）のリストを取得しループ
 for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
 
@@ -212,7 +235,8 @@ for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
     GCS_BUCKET_PREFIX=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".gcs_bucket_prefix")
 
     # 4-a. ランダムな4桁の英数字 suffix を生成（方法1）
-    RANDOM_SUFFIX=$(tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
+    RANDOM_SUFFIX=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
+    # RANDOM_SUFFIX=$(tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
 
     # 4-b. バケット名の構築
     BUCKET_NAME="${GCS_BUCKET_PREFIX}-${CUSTOMER_PROJECT_ID}-${RANDOM_SUFFIX}"
@@ -245,14 +269,10 @@ for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
 done
 ```
 
-### 6. メイン分析ジョブ (gemini-bq-query-analyzer-job) の作成
+### 8. メイン分析ジョブ (gemini-bq-query-analyzer-job) の作成
 
 ```bash
 cd main-app
-# .envファイルから変数を読み込む
-set -a
-source ../.env
-set +a
 
 gcloud run jobs deploy gemini-bq-query-analyzer-job \
     --source . \
@@ -272,30 +292,27 @@ gcloud run jobs deploy gemini-bq-query-analyzer-job \
     # --set-env-vars TIME_RANGE_END=${TIME_RANGE_END}
 ```
 
-### 7. workflowsの設定
+### 9. workflowsの設定
 
 ```bash
 cd ../workflows
 
-set -a
-source ../.env
-set +a
-
 # YAML内の変数を環境変数で置換した一時ファイルを生成してデプロイ
 # (Terraformのtemplatefile相当の処理)
 cat analyzer_workflow.yaml | sed \
+  -e 's/\$\${/${/g' \
   -e "s/\${project_id}/${SAAS_PROJECT_ID}/g" \
   -e "s/\${region}/${REGION}/g" \
   -e "s/\${job_name}/gemini-bq-query-analyzer-job/g" > processed_workflow.yaml
 
 gcloud workflows deploy gemini-bq-query-analyzer-workflow \
     --source processed_workflow.yaml \
-    --region $REGION \
+    --location $REGION \
     --project $SAAS_PROJECT_ID \
     --service-account=${SA_EMAIL}
 ```
 
-### 8. スケジューラーの設定(コマンドは要検証)
+### 10. スケジューラーの設定(コマンドは要検証)
 
 ```bash
 # jqを使用してテナントごとにループ実行

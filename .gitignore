@@ -12,7 +12,6 @@
 tools/token.json
 client_secrets.json
 .venv
-*.env
 
 # Automatically created terraform files
 
@@ -38,3 +37,4 @@ change.patch
 .build/
 tests/test.sql
 bq-antipattern-api/*.jar
+processed_workflow.yaml

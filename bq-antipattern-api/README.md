@@ -1,13 +1,16 @@
 # BigQuery Antipattern API
 
 ## 📌 概要
+
 `bq-antipattern-api` は、Google Cloud 公式のOSSツールである [bigquery-antipattern-recognition](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition) をラップし、REST APIとして提供するマイクロサービスです。
 
 BigQueryのSQLクエリを受け取り、AST（構文木）解析によってBigQuery特有のアンチパターン（パフォーマンス低下やコスト増大の要因）を検出し、その結果をスッキリとしたJSON形式で返却します。
 SaaS型の自動SQL監査基盤において、**「構文解析エンジン」**の役割を担います。
 
 ## 🏗 アーキテクチャ設計の意図
+
 公式ツールはJavaで実装されており、通常はCLIツールとして実行されますが、本システムでは以下の理由からPython (FastAPI) でAPI化（Cloud Run化）しています。
+
 * **オーケストレーションの分離**: 抽出・AI生成（Cloud Run A）と構文解析（Cloud Run B）を疎結合にし、各コンポーネントのスケールと保守を容易にするため。
 * **JVM起動ロスの隠蔽**: FastAPIの裏側でJavaプロセスを起動することで、呼び出し元から扱いやすい標準的なHTTP APIとして振る舞わせるため。
 * **テキストのノイズ除去**: Javaが吐き出す大量の実行ログから、Pythonの正規表現を用いて「必要な改善推奨事項（Recommendations）」のみを抽出してAIへ渡すため。
