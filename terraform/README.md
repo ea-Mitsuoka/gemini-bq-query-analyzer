@@ -43,7 +43,7 @@
 # ==========================================
 SAAS_PROJECT_ID="saas_project-id"
 REGION="us-central1"
-BQ_ANTIPATTERN_API_URL=https://bq-antipattern-api-xxxxx.a.run.app
+BQ_ANTIPATTERN_API_URL=https://bq-antipattern-api-<saas_project_number>.<region>.run.app
 
 # ==========================================
 # マルチテナント設定 (JSON 形式)
