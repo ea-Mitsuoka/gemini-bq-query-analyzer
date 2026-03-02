@@ -211,22 +211,6 @@ for ROLE in ${CUSTOMER_ROLES[@]}; do
     echo $ROLE
 done
 
-
-# 2. jq を使ってテナントのキー（pacific-legend, datatechlab）のリストを取得しループ
-for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
-
-    # 3. 各テナントの詳細情報を取得
-    CUSTOMER_PROJECT_ID=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".customer_project_id")
-
-    # 5. IAMロールを付与
-    for ROLE in ${CUSTOMER_ROLES[@]}; do
-        gcloud projects add-iam-policy-binding $CUSTOMER_PROJECT_ID \
-            --member="serviceAccount:${SA_EMAIL}" \
-            --role="$ROLE" \
-            --condition=None
-    done
-done
-
 # 2. jq を使ってテナントのキー（pacific-legend, datatechlab）のリストを取得しループ
 for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
 
