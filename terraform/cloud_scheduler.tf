@@ -1,10 +1,11 @@
 resource "google_cloud_scheduler_job" "tenant_schedulers" {
   for_each = var.tenants
 
-  name     = "gemini-bq-query-analyzer-scheduler-${each.key}"
-  schedule = each.value.scheduler_cron
-  project  = var.saas_project_id
-  region   = var.region
+  name      = "gemini-bq-query-analyzer-scheduler-${each.key}"
+  schedule  = each.value.scheduler_cron
+  project   = var.saas_project_id
+  region    = var.region
+  time_zone = "Asia/Tokyo"
 
   http_target {
     http_method = "POST"
