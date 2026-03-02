@@ -9,12 +9,16 @@ resource "null_resource" "build_api_image" {
   provisioner "local-exec" {
     command = <<EOT
       gcloud builds submit ../bq-antipattern-api \
-        --tag gcr.io/${var.saas_project_id}/bq-antipattern-api:latest \
+        --tag ${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/bq-antipattern-api:latest \
         --project ${var.saas_project_id}
     EOT
   }
-  # APIが有効になってからビルドを開始する
-  depends_on = [terraform_data.api_completion]
+
+  # 1. APIが有効であること + 2. リポジトリが存在すること の両方を条件にする
+  depends_on = [
+    terraform_data.api_completion,
+    google_artifact_registry_repository.cloud_run_source_deploy
+  ]
 }
 
 # Cloud Buildを利用してローカルソースからイメージをビルド・デプロイする構成
@@ -28,8 +32,7 @@ resource "google_cloud_run_v2_service" "antipattern_api" {
       # ビルドされたイメージ名を指定（プロジェクト内のArtifact Registry等を参照）
       # ここではビルド後に生成されるパスを動的に指定するか、
       # 簡略化のためCloud Buildの結果を受け取る構成にします
-      image = "gcr.io/${var.saas_project_id}/bq-antipattern-api:latest"
-
+      image = "${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/bq-antipattern-api:latest"
       resources {
         limits = {
           cpu    = "1000m"

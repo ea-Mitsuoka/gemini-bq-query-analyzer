@@ -70,5 +70,10 @@ resource "null_resource" "build_main_app_image" {
         --project ${var.saas_project_id}
     EOT
   }
-  depends_on = [terraform_data.api_completion]
+
+  # 1. APIが有効であること + 2. リポジトリが存在すること の両方を条件にする
+  depends_on = [
+    terraform_data.api_completion,
+    google_artifact_registry_repository.cloud_run_source_deploy
+  ]
 }
