@@ -38,3 +38,4 @@ change.patch
 tests/test.sql
 bq-antipattern-api/*.jar
 processed_workflow.yaml
+configs/
