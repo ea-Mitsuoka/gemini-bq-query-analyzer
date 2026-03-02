@@ -85,20 +85,20 @@ gcloud auth login
 gcloud auth application-default login
 ```
 
-### 2-2. terraform apply
+### 2-5. terraform apply
 
 ```bash
 cd terraform
 terraform apply
 ```
 
-## 🚀 この構成のメリット
-
-* **完全自動化**: `terraform apply` を叩くだけで、ソースコードのアップロード、ビルド、イメージ作成、Cloud Runへの反映が一気通貫で行われます。
-* **賢い再ビルド**: `sha256` によるトリガーを設定したため、`app.py` や JAR ファイルを書き換えたときだけビルドが走り、変更がないときはスキップされるので高速です。
-
-## 環境破棄
+## 3. 環境破棄
 
 * `terraform destroy`を成功させるには、事前に以下の２点を済ませておく必要がある
   * 顧客プロジェクトのバケットの中身を空にする
   * SaaSプロジェクトのmasterテーブルを削除(`bq rm -r -f -d <saas_project_id>:audit_master`)する
+
+## 🚀 この構成のメリット
+
+* **完全自動化**: `terraform apply` を叩くだけで、ソースコードのアップロード、ビルド、イメージ作成、Cloud Runへの反映が一気通貫で行われます。
+* **賢い再ビルド**: `sha256` によるトリガーを設定したため、`app.py` や JAR ファイルを書き換えたときだけビルドが走り、変更がないときはスキップされるので高速です。
