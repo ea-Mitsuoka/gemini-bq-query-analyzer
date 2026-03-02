@@ -7,10 +7,6 @@ variable "region" {
   default = "us-central1"
 }
 
-variable "bq_antipattern_api_url" {
-  type = string
-}
-
 variable "service_account_id" {
   default = "gemini-bq-query-analyzer-sa"
 }
