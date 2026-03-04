@@ -1,6 +1,67 @@
 # Gemini BQ Query Analyzer
 
 BigQueryの `INFORMATION_SCHEMA` からワーストクエリを抽出し、Geminiを使ってコスト・パフォーマンスの最適化案を自動生成・通知するツールです。
+## アーキテクチャ図
+
+```mermaid
+flowchart LR
+    %% ─── Terraform (top) ────────────────────────────────────────────────────
+    TF["🏗 Terraform\n全リソース IaC 管理\ntfvars で Client 差分を管理"]
+
+    %% ─── SaaS Project ───────────────────────────────────────────────────────
+    subgraph SAAS["☁️ SaaS Project"]
+        direction LR
+        SCH["① 🕐 Cloud Scheduler\n定期トリガー"]
+        WF["② 🔀 Cloud Workflows\nClient ごとの環境変数を\n上書きして Job 起動"]
+        JOB["③ 🚀 Cloud Run Job\nMain Process"]
+        OSS["⑤ 🔍 Cloud Run Service\nBQ Antipattern Recognition\nFastAPI Wrapper"]
+        VAI["⑥ 🤖 Vertex AI / Gemini\nクエリ最適化\nアドバイス生成"]
+    end
+
+    %% ─── Customer / Client Project ──────────────────────────────────────────
+    subgraph CLIENT["🏢 Customer / Client Project"]
+        direction TB
+        BQ["④ 🗄 BigQuery\nINFORMATION_SCHEMA\n.JOBS_BY_PROJECT"]
+        GCS["⑦ 🪣 Cloud Storage\nMarkdown レポート格納"]
+        SLACK["⑧ 💬 Slack\nGCS パスとサマリーを通知"]
+    end
+
+    %% ─── Flows ───────────────────────────────────────────────────────────────
+    SCH -->|"① Cron で起動"| WF
+    WF  -->|"② 環境変数上書きで起動"| JOB
+    JOB -->|"③ ジョブ履歴を取得"| BQ
+    BQ  -->|"④ 履歴・スキャン量を返却"| JOB
+    JOB -->|"⑤ HTTP POST\nクエリ文字列"| OSS
+    OSS -->|"⑤ アンチパターン\n検出結果を返却"| JOB
+    JOB -->|"⑥ OSS結果＋クエリを\nプロンプト送信"| VAI
+    VAI -->|"⑥ 最適化アドバイス\nを返却"| JOB
+    JOB -->|"⑦ Markdown\nをアップロード"| GCS
+    JOB -->|"⑧ GCS パス＆\nサマリーを通知"| SLACK
+
+    TF -.->|manages| SAAS
+    TF -.->|manages| CLIENT
+
+    %% ─── Styles ─────────────────────────────────────────────────────────────
+    classDef scheduler fill:#1e3a5f,stroke:#3b82f6,color:#bfdbfe
+    classDef workflows  fill:#0c2a4a,stroke:#0ea5e9,color:#bae6fd
+    classDef crjob      fill:#0c2040,stroke:#22d3ee,color:#a5f3fc
+    classDef crservice  fill:#0d2e2e,stroke:#2dd4bf,color:#99f6e4
+    classDef vertexai   fill:#1e1040,stroke:#a78bfa,color:#ddd6fe
+    classDef bigquery   fill:#0f2d1f,stroke:#34d399,color:#a7f3d0
+    classDef gcs        fill:#0f2d1f,stroke:#34d399,color:#a7f3d0
+    classDef slack      fill:#2d1515,stroke:#f87171,color:#fecaca
+    classDef terraform  fill:#1e1040,stroke:#7c3aed,color:#c4b5fd
+
+    class SCH scheduler
+    class WF workflows
+    class JOB crjob
+    class OSS crservice
+    class VAI vertexai
+    class BQ bigquery
+    class GCS gcs
+    class SLACK slack
+    class TF terraform
+```
 
 ## 📁 ディレクトリ構成
 
@@ -99,6 +160,8 @@ python main-app/src/main.py
 ```
 
 ## ☁️ Cloud Run へのデプロイ手順
+
+[注意]Terraformによるデプロイ手順は`terraform/README.md`をご確認ください。
 
 ### 1. SaaSプロジェクトのAPIの有効化
 
