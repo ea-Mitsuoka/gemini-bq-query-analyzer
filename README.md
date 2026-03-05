@@ -2,7 +2,7 @@
 
 BigQueryの `INFORMATION_SCHEMA` からワーストクエリを抽出し、Geminiを使ってコスト・パフォーマンスの最適化案を自動生成・通知するツールです。
 
-## アーキテクチャ図
+## 🏗️ アーキテクチャ図
 
 ```mermaid
 flowchart LR
@@ -170,7 +170,7 @@ cd terraform
 terraform apply
 ```
 
-## 環境破棄
+## 🗑️ 環境破棄
 
 * `terraform destroy`を成功させるには、事前に以下の２点を済ませておく必要がある
   * 顧客プロジェクトのバケットの中身を空にする
@@ -354,7 +354,7 @@ gcloud run jobs deploy gemini-bq-query-analyzer-job \
     # --set-env-vars TIME_RANGE_END=${TIME_RANGE_END}
 ```
 
-### 9. workflowsの設定
+### 9. Workflowsの設定
 
 ```bash
 cd ../workflows
@@ -373,7 +373,7 @@ gcloud workflows deploy gemini-bq-query-analyzer-workflow \
     --service-account=${SA_EMAIL}
 ```
 
-### 10. スケジューラーの設定
+### 10. Cloud Schedulerの設定
 
 ```bash
 # jqを使用してテナントごとにループ実行
