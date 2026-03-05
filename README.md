@@ -105,7 +105,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 ---
 
-## ☁️ 環境構築手順 Terraform編
+## ☁️ 環境構築: Terraform編
 
 ### 1. BigQuery Antipattern Recognitionツールの準備
 
@@ -176,7 +176,7 @@ terraform apply
   * 顧客プロジェクトのバケットの中身を空にする
   * SaaSプロジェクトのmasterテーブルを削除(`bq rm -r -f -d <saas_project_id>:audit_master`)する
 
-## ☁️ 環境構築手順 gcloudコマンド&shell編
+## ☁️ 環境構築: gcloud編
 
 ### 1. SaaSプロジェクトのAPIの有効化
 
