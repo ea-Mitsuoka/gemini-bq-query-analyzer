@@ -417,7 +417,9 @@ for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
 done
 ```
 
+---
+
 ### 💡 メモ
 
-* `.env` ファイルの読み込み仕様について（モノレポ化の背景）
+* `.env` ファイルの読み込み仕様について
   * 当プロジェクトでは、インフラ（Terraform）、メインバッチ（`main-app/`）、API（`bq-antipattern-api/`）をひとつのリポジトリで管理するモノレポ構成を採用しています。
