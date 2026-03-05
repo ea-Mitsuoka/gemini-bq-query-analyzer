@@ -176,6 +176,8 @@ terraform apply
   * 顧客プロジェクトのバケットの中身を空にする
   * SaaSプロジェクトのmasterテーブルを削除(`bq rm -r -f -d <saas_project_id>:audit_master`)する
 
+---
+
 ## ☁️ 環境構築: gcloud編
 
 ### 1. SaaSプロジェクトのAPIの有効化
@@ -422,4 +424,4 @@ done
 ### 💡 メモ
 
 * `.env` ファイルの読み込み仕様について
-  * 当プロジェクトでは、インフラ（Terraform）、メインバッチ（`main-app/`）、API（`bq-antipattern-api/`）をひとつのリポジトリで管理するモノレポ構成を採用しています。
+  * 当プロジェクトでは、インフラ（Terraform）、メインバッチ（`main-app/`）、API（`bq-antipattern-api/`）をひとつのリポジトリで管理するモノレポ構成を採用しており`.env`ファイルは両方から参照します。
