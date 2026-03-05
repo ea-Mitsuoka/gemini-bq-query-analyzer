@@ -1,6 +1,7 @@
 # Gemini BQ Query Analyzer
 
 BigQueryの `INFORMATION_SCHEMA` からワーストクエリを抽出し、Geminiを使ってコスト・パフォーマンスの最適化案を自動生成・通知するツールです。
+
 ## アーキテクチャ図
 
 ```mermaid
