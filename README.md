@@ -170,7 +170,7 @@ cd terraform
 terraform apply
 ```
 
-## 3. 環境破棄
+## 環境破棄
 
 * `terraform destroy`を成功させるには、事前に以下の２点を済ませておく必要がある
   * 顧客プロジェクトのバケットの中身を空にする
