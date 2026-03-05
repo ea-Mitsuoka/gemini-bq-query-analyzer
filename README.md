@@ -100,67 +100,83 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 ## 🛑 前提条件
 
-* 原則として以下の5つの手順でだけで環境構築はできます。
-  * JAR ファイルの準備: `bq-antipattern-api/`直下に`bigquery-antipattern-recognition.jar`を配置
-  * `.env`ファイルを準備
-  * `tools/`で`generate_tfvars.py`を実行
-  * 分析対象の顧客プロジェクトでterraformを実行するユーザーに対して`Project IAM 管理者`と`Storage 管理者`ロールを付与
-  * `terraform/`で`terraform apply`を実行
 * Terraform実行アカウントに顧客プロジェクトで`Project IAM 管理者`と`ストレージ 管理者`のIAMロールが必要です。
 * 置換変数の整合性: gemini_prompt.txt 内で使用する変数（{query} や {billed_gb} など）が、Python コード側で定義した辞書のキーと完全に一致している必要があります。
 
 ---
 
-## 💻 ローカルでの開発・テスト環境セットアップ
+## ☁️ 環境構築手順(Terraform)
 
-### 1. 依存ライブラリのインストール
+### 1. BigQuery Antipattern Recognitionツールの準備
+
+* [Github](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases)から`bigquery-antipattern-recognition.jar`をダウンロード
+* `bq-antipattern-api/`に`bigquery-antipattern-recognition.jar`を配置
+
+### 2. `.env`ファイルを設定
+
+例:
 
 ```bash
-pip install -r requirements.txt
-```
-
-### 2. 環境変数の設定
-
-ルートディレクトリに .env ファイルを作成し、以下の変数を設定します（Gitにはコミットされません）。
-
-```bash
-SAAS_PROJECT_ID=your-saas-project-id
-CUSTOMER_PROJECT_ID=target-customer-project-id
+# ==========================================
+# 共通設定 (SaaS 基盤側)
+# ==========================================
+SAAS_PROJECT_ID="saas_project-id"
 REGION="us-central1"
-SLACK_WEBHOOK_URL=your-slack-webhook-url
-GCS_BUCKET_NAME=for-reports-storage
-# 抽出するワーストクエリの最大件数（コスト、実行時間それぞれ）
-WORST_QUERY_LIMIT=1
-# --- 調査期間の設定 ---
-# [注意]180日より前のクエリ履歴やジョブデータは自動的に消去されるため、調査期間は180日以内に設定してください。
-# パターン1: 相対指定で期間を決める場合 (優先)
-+ # 例: "1 DAY", "7 DAY", "30 DAY", "12 HOUR" などを指定します。
-TIME_RANGE_INTERVAL="1 DAY"
+# terraformが動的に取得するため不要↓
+# BQ_ANTIPATTERN_API_URL=https://bq-antipattern-api-<saas_project_number>.<region>.run.app
 
-# パターン2: 絶対時間で期間を決める場合
-# TIME_RANGE_INTERVALを空にして、以下を指定します (形式: YYYY-MM-DD HH:MM:SS)
-# TIME_RANGE_START="2024-01-01 00:00:00"
-# TIME_RANGE_END="2024-01-31 23:59:59"
-# ---
-# 1. 最優先で適用される（他の設定を上書きする）
-# - コードの一番最初（if TIME_RANGE_INTERVAL:）で判定されているため、この変数に値が入っている場合は、仮に .env で TIME_RANGE_START や TIME_RANGE_END が設定されていたとしても、それらはすべて無視されます。
-# 2. 開始時刻（start_time_expr）の計算
-# - SQLの TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ○○) という関数を使って開始時刻を作ります。
-# - これは「プログラムを実行した現在時刻（CURRENT_TIMESTAMP()）から、指定された期間（TIME_RANGE_INTERVAL）を引き算する」という処理です。
-# 3. 終了時刻（end_time_expr）は「現在まで」になる
-# - end_time_expr = "" と空文字（カラ）に設定されます。
-# - これにより、後続のSQL組み立て部分で上限（終了日時）の条件が追加されなくなります。上限がないということは、開始時刻から**「最新のクエリ（現在時刻）」まですべて**が調査対象になります。
+# ==========================================
+# マルチテナント設定 (JSON 形式)
+# ==========================================
+# 💡 顧客が増える場合は、この JSON 内に要素を追加してください。
+# ※ シングルクォーテーションで囲むことで、内部のダブルクォーテーションを許容します。
+TENANTS_JSON='{
+  "tenant1": {
+    "customer_project_id": "tenant1_project_id",
+    "worst_query_limit": "1",
+    "time_range_interval": "1 DAY",
+    "gcs_bucket_prefix": "gemini-query-analyzer-reports",
+    "slack_webhook_url": "https://hooks.slack.com/services/xxx/yyy/zzz",
+    "scheduler_cron": "0 9 * * *"
+  },
+  "tenant2": {
+    "customer_project_id": "tenant2_project_id",
+    "worst_query_limit": "1",
+    "time_range_interval": "2 DAY",
+    "gcs_bucket_prefix": "gemini-query-analyzer-reports",
+    "slack_webhook_url": "https://hooks.slack.com/services/xxx/yyy/zzz",
+    "scheduler_cron": "0 10 * * *"
+  }
+}'
 ```
 
-### 3. ローカル実行
+### 3. tfvarsファイルの作成
+
+`tools/`で`generate_tfvars.py`を実行
+
+### 4. gcloudで認証
+
+Terraformを実行する環境（PCやCI/CD）でコマンドを実行
 
 ```bash
-python main-app/src/main.py
+gcloud auth login
+gcloud auth application-default login
 ```
 
-## ☁️ Cloud Run へのデプロイ手順
+### 5. terraform apply
 
-[注意]Terraformによるデプロイ手順は`terraform/README.md`をご確認ください。
+```bash
+cd terraform
+terraform apply
+```
+
+## 3. 環境破棄
+
+* `terraform destroy`を成功させるには、事前に以下の２点を済ませておく必要がある
+  * 顧客プロジェクトのバケットの中身を空にする
+  * SaaSプロジェクトのmasterテーブルを削除(`bq rm -r -f -d <saas_project_id>:audit_master`)する
+
+## ☁️ 環境構築手順(gcloud)
 
 ### 1. SaaSプロジェクトのAPIの有効化
 
