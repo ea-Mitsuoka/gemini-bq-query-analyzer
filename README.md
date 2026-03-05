@@ -112,8 +112,6 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 ## 💻 ローカルでの開発・テスト環境セットアップ
 
-**※ コマンドはすべてプロジェクトのルートディレクトリで実行してください。**
-
 ### 1. 依存ライブラリのインストール
 
 ```bash
@@ -231,7 +229,7 @@ done
 
 ### 4. bq-antipattern-apiのデプロイ
 
-詳細は`bq-antipattern-api/README.md`を確認する
+[注意]Cloud Run Serviceのデプロイ手順は`bq-antipattern-api/README.md`をご確認ください。
 
 ### 5. bq-antipattern-apiのURLを取得
 
@@ -345,7 +343,6 @@ gcloud run jobs deploy gemini-bq-query-analyzer-job \
 cd ../workflows
 
 # YAML内の変数を環境変数で置換した一時ファイルを生成してデプロイ
-# (Terraformのtemplatefile相当の処理)
 cat analyzer_workflow.yaml | sed \
   -e 's/\$\${/${/g' \
   -e "s/\${project_id}/${SAAS_PROJECT_ID}/g" \
@@ -407,4 +404,3 @@ done
 
 * `.env` ファイルの読み込み仕様について（モノレポ化の背景）
   * 当プロジェクトでは、インフラ（Terraform）、メインバッチ（`main-app/`）、API（`bq-antipattern-api/`）をひとつのリポジトリで管理するモノレポ構成を採用しています。
-  * ローカル開発用の `.env` ファイルは各アプリケーションのディレクトリ内ではなく、**プロジェクトのルートディレクトリに1つだけ配置**し、全アプリケーションで共有する運用としています。
