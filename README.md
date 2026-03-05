@@ -105,7 +105,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
   * `tools/`で`generate_tfvars.py`を実行
   * 分析対象の顧客プロジェクトでterraformを実行するユーザーに対して`Project IAM 管理者`と`Storage 管理者`ロールを付与
   * `terraform/`で`terraform apply`を実行
-* 分析対象の顧客プロジェクトにトで`Project IAM 管理者`と`ストレージ 管理者`のIAMロールが必要
+* 分析対象の顧客プロジェクトにトで`Project IAM 管理者`と`ストレージ 管理者`のIAMロールが必要です。
 * 置換変数の整合性: gemini_prompt.txt 内で使用する変数（{query} や {billed_gb} など）が、Python コード側で定義した辞書のキーと完全に一致している必要があります。
 
 ---
