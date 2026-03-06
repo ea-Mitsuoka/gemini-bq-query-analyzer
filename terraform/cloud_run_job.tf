@@ -50,7 +50,7 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
           name  = "WORST_QUERY_LIMIT"
           value = ""
         }
-        # Slack通知はWorkflowが行うため、Job側のSLACK_WEBHOOK_URLは不要になります
+        # Slack通知はWorkflowが行うため、Job側のslack_webhook_secret_nameは不要になります
       }
     }
   }

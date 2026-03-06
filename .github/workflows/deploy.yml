@@ -1,0 +1,52 @@
+name: "Manual Deploy from Spreadsheet"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate Configs from Spreadsheet
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: python tools/generate_configs.py
+
+      # --- 追加ステップ: Artifactへの保存 ---
+      - name: Upload Config Files as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-configs
+          # 取得したいファイルのパスを指定（ディレクトリが異なる点に注意）
+          path: |
+            .env
+            terraform/terraform.tfvars
+          retention-days: 1 # セキュリティのため短期間で自動削除
+      # ------------------------------------
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init & Apply
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: |
+          cd terraform
+          terraform init
+          terraform apply -auto-approve

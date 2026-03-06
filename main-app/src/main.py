@@ -2,6 +2,7 @@ import os
 import logging
 import requests
 import datetime
+import json
 from functools import lru_cache
 import google.auth
 import google.auth.transport.requests
@@ -54,6 +55,26 @@ def load_external_file(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
     with open(filepath, "r", encoding="utf-8") as f:
         return f.read()
+
+def check_bucket_exists(storage_client, bucket_name):
+    """バケットの存在とアクセス権を確認"""
+    if not bucket_name:
+        logger.error("GCS_BUCKET_NAME is not set (empty). Check spreadsheet config.")
+        return False
+
+    try:
+        storage_client.get_bucket(bucket_name)
+        logger.info(f"✅ Connection verified: GCS Bucket '{bucket_name}' is accessible.")
+        return True
+    except NotFound:
+        logger.error(f"Bucket '{bucket_name}' not found in customer project.")
+        return False
+    except Forbidden:
+        logger.error(f"Access denied to bucket '{bucket_name}'. Check analyzer_sa permissions.")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected Error while checking bucket '{bucket_name}': {e}")
+        return False
 
 def get_current_user_email(client):
     """実行者のメールアドレスを取得（除外用）"""
@@ -274,41 +295,45 @@ def build_gemini_prompt(job, schema_info_text, antipattern_raw_text, master_dict
         logger.error(f"Failed to build prompt from external file: {e}")
         return f"Analyze this SQL: {job.query}"
 
-def upload_report_to_gcs(bucket_name, report_content, project_id):
-    """Markdown形式のレポートをGCSへアップロード"""
+def upload_report_to_gcs(bucket_name, report_content, customer_project_id):
+    """Markdown形式のレポートを既存のGCSバケットへアップロード"""
     if not bucket_name:
-        logger.warning("GCS_BUCKET_NAME is not set. Skipping GCS upload.")
         return None
     try:
-        # GCSバケットはCUSTOMER_PROJECT_IDに存在する前提
-        storage_client = storage.Client(project=project_id)
+        # 顧客のプロジェクトIDを指定してストレージクライアントを作成
+        storage_client = storage.Client(project=customer_project_id)
         bucket = storage_client.bucket(bucket_name)
+
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"bq_audit_report_{project_id}_{timestamp}.md"
+        filename = f"reports/bq_audit_report_{timestamp}.md"
         blob = bucket.blob(filename)
 
-        # マークダウンテキストとしてアップロード
         blob.upload_from_string(report_content, content_type="text/markdown")
+        logger.info(f"Report uploaded to: gs://{bucket_name}/{filename}")
 
-        # Cloud Console上の該当ファイル閲覧URLを返す（CUSTOMER_PROJECT_IDを指定）
-        return f"https://console.cloud.google.com/storage/browser/_details/{bucket_name}/{filename}?project={project_id}"
+        return f"https://console.cloud.google.com/storage/browser/_details/{bucket_name}/{filename}?project={customer_project_id}"
     except Exception as e:
         logger.error(f"Failed to upload report to GCS: {e}")
         return None
 
 def save_summary_for_workflow(bucket_name, text_summary, customer_project_id):
-    """Workflowが読み取れるようにサマリーをJSON保存する"""
+    """Workflowが通知用に読み取れるよう、固定パスにJSON保存する"""
     if not bucket_name: return
     try:
         storage_client = storage.Client(project=customer_project_id)
         bucket = storage_client.bucket(bucket_name)
+        # Workflowが期待するパス "results/summary.json"
         blob = bucket.blob("results/summary.json")
-        import json
-        data = {"text_summary": text_summary, "timestamp": str(datetime.datetime.now())}
+
+        data = {
+            "text_summary": text_summary,
+            "timestamp": str(datetime.datetime.now()),
+            "customer_project_id": customer_project_id
+        }
         blob.upload_from_string(json.dumps(data, ensure_ascii=False), content_type="application/json")
-        logger.info("Summary saved for Workflow.")
+        logger.info("Summary JSON saved for Workflow.")
     except Exception as e:
-        logger.error(f"Failed to save summary: {e}")
+        logger.error(f"Failed to save summary JSON: {e}")
 
 # ==========================================
 # メインプロセス
@@ -325,6 +350,11 @@ def main():
     # クライアント初期化
     bq_client = bigquery.Client(project=SAAS_PROJECT_ID)
     customer_bq_client = bigquery.Client(project=CUSTOMER_PROJECT_ID)
+    # バケットの疎通確認
+    storage_client = storage.Client(project=CUSTOMER_PROJECT_ID) # 顧客プロジェクト用
+    if not check_bucket_exists(storage_client, GCS_BUCKET_NAME):
+        return
+
     vertexai.init(project=SAAS_PROJECT_ID, location=LOCATION)
     model = GenerativeModel("gemini-2.5-flash")
 

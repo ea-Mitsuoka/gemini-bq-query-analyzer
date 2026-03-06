@@ -18,19 +18,19 @@ variable "bq_dataset_id" {
 variable "tenants" {
   type = map(object({
     customer_project_id = string
+    gcs_bucket_name     = string
     worst_query_limit   = string
     time_range_interval = string
-    gcs_bucket_prefix   = string
-    slack_webhook_url   = string
+    slack_webhook_secret_name   = string
     scheduler_cron      = string
   }))
   default = {
     "default_tenant" = { # ← ここに任意のキーが必要です
       customer_project_id = ""
+      gcs_bucket_name     = ""
       worst_query_limit   = "1"
       time_range_interval = "1 DAY"
-      gcs_bucket_prefix   = "gemini-bq-query-analyzer-reports"
-      slack_webhook_url   = ""
+      slack_webhook_secret_name   = ""
       scheduler_cron      = "0 9 * * *"
     }
   }

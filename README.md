@@ -40,7 +40,7 @@ flowchart LR
     JOB -->|"⑧ GCS パス＆\nサマリーを通知"| SLACK
 
     TF -.->|manages| SAAS
-    TF -.->|manages| CLIENT
+    TF -.->|grants IAM to SA| CLIENT
 
     %% ─── Styles ─────────────────────────────────────────────────────────────
     classDef scheduler fill:#1e3a5f,stroke:#3b82f6,color:#bfdbfe
@@ -100,7 +100,6 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 ## 🛑 前提条件
 
-* Terraform実行アカウントに顧客プロジェクトで`Project IAM 管理者`と`ストレージ 管理者`のIAMロールが必要です。
 * 置換変数の整合性: gemini_prompt.txt 内で使用する変数（{query} や {billed_gb} など）が、Python コード側で定義した辞書のキーと完全に一致している必要があります。
 
 ---
@@ -109,12 +108,104 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 ### 1. BigQuery Antipattern Recognitionツールの準備
 
+Cloud Run ServiceとしてデプロイしてAPI化するために下記を実施
+
 * [Github](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases)から`bigquery-antipattern-recognition.jar`をダウンロード
 * `bq-antipattern-api/`に`bigquery-antipattern-recognition.jar`を配置
 
-### 2. `.env`ファイルを設定
+### 2. `base_config.ini`ファイルを設定
 
-例:
+```bash
+[gcp]
+saas_project_id = <saas_project_id>
+region = us-central1
+```
+
+### 3. Terraform実行用のサービスアカウント作成 & IAMロール付与
+
+Terraform実行用サービスアカウントに必要なIAMロール
+
+1. Project IAM 管理者`roles/resourcemanager.projectIamAdmin`(IAMロールを付与する権限)
+2. Service Usage Admin`roles/serviceusage.serviceUsageAdmin`(APIを有効化)
+3. Cloud Build 編集者`roles/cloudbuild.builds.editor`(Cloud Build を実行する権限)
+4. Artifact Registry 管理者`roles/artifactregistry.admin`(Dockerリポジトリの作成および削除)
+5. サービス アカウント 管理者`roles/iam.serviceAccountAdmin`(サービスアカウント作成および削除)
+6. Storage 管理者`roles/storage.Admin`(tfstateファイルを格納するBackendバケット作成)
+7. BigQuery データ管理者`roles/bigquery.dataOwner`(BigQueryのデータセットとテーブルを作成および削除)
+8. BigQuery ジョブユーザー`roles/bigquery.jobUser`(BigQueryのテーブル読み取り,DDL実行)
+9. Cloud Scheduler 管理者`roles/cloudscheduler.admin`(ジョブの作成および削除)
+10. Workflows 編集者`roles/workflows.editor`(workflowの作成および削除)
+11. Secret Manager Viewer`roles/secretmanager.viewer`(Slack Webhook URLの確認)
+12. Cloud Run 開発者`roles/run.developer`(Cloud Runサービスやジョブの作成および削除)
+13. ログ書き込み`roles/logging.logWriter`(ログエントリ作成)
+
+Terraform実行用のサービスアカウント作成
+
+```bash
+export $(grep -v '^\[.*\]' base_config.ini | sed 's/ *= */=/g' | xargs)
+
+gcloud iam service-accounts create terraform-deployer-sa \
+    --display-name="Terraform SaaS Infrastructure Manager" \
+    --project=${saas_project_id}
+
+ROLES=(
+    "roles/resourcemanager.projectIamAdmin"
+    "roles/serviceusage.serviceUsageAdmin"
+    "roles/cloudbuild.builds.editor"
+    "roles/artifactregistry.admin"
+    "roles/iam.serviceAccountAdmin"
+    "roles/storage.Admin"
+    "roles/bigquery.dataOwner"
+    "roles/bigquery.jobUser"
+    "roles/cloudscheduler.admin"
+    "roles/workflows.editor"
+    "roles/secretmanager.viewer"
+    "roles/run.developer"
+    "roles/logging.logWriter"
+)
+
+SA_EMAIL="terraform-deployer-sa@${saas_project_id}.iam.gserviceaccount.com"
+
+# ループによる権限付与の実行
+echo "Starting IAM policy binding for ${SA_EMAIL} in project ${saas_project_id}..."
+
+for ROLE in "${ROLES[@]}"; do
+    echo "Adding role: ${ROLE}"
+    gcloud projects add-iam-policy-binding "${saas_project_id}" \
+        --member="serviceAccount:${SA_EMAIL}" \
+        --role="${ROLE}" \
+        --no-user-output-enabled # ログをスッキリさせるためのオプション（任意）
+done
+
+echo "IAM policy binding completed."
+```
+
+### 4. 顧客情報のスプレッドシート`Gemini-BQ-Query-Analyzer-Tenant-Master`を準備
+
+下記の項目を設定する
+
+* tenant_id
+* customer_project_id
+* gcs_bucket_name(顧客に作成してもらい、バケット名を聞く)
+* worst_query_limit
+* time_range_interval
+* slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
+* scheduler_cron
+
+### 5. Github Actionsの手動実行
+
+Github Actionsには、terraform実行用のサービスアカウントのJSONと顧客情報スプレッドシートのIDを保存しておく
+
+* GitHub リポジトリの Actions タブに移動
+* 左側のメニューから Manual Deploy from Spreadsheet（または設定したワークフロー名）を選択
+* Run workflow ボタンをクリックして実行
+  * `terraform apply`まで実行される
+
+### 6. 生成ファイルの確認とダウンロード（必要に応じて）
+
+出力例:
+
+\# .env
 
 ```bash
 # ==========================================
@@ -122,59 +213,83 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 # ==========================================
 SAAS_PROJECT_ID="saas_project-id"
 REGION="us-central1"
-# terraformが動的に取得するため不要↓
-# BQ_ANTIPATTERN_API_URL=https://bq-antipattern-api-<saas_project_number>.<region>.run.app
 
 # ==========================================
 # マルチテナント設定 (JSON 形式)
 # ==========================================
-# 💡 顧客が増える場合は、この JSON 内に要素を追加してください。
-# ※ シングルクォーテーションで囲むことで、内部のダブルクォーテーションを許容します。
 TENANTS_JSON='{
   "tenant1": {
     "customer_project_id": "tenant1_project_id",
+    "gcs_bucket_name": "gemini-query-analyzer-reports",
     "worst_query_limit": "1",
     "time_range_interval": "1 DAY",
-    "gcs_bucket_prefix": "gemini-query-analyzer-reports",
-    "slack_webhook_url": "https://hooks.slack.com/services/xxx/yyy/zzz",
+    "slack_webhook_secret_name": "",
     "scheduler_cron": "0 9 * * *"
   },
   "tenant2": {
     "customer_project_id": "tenant2_project_id",
+    "gcs_bucket_name": "gemini-query-analyzer-reports",
     "worst_query_limit": "1",
     "time_range_interval": "2 DAY",
-    "gcs_bucket_prefix": "gemini-query-analyzer-reports",
-    "slack_webhook_url": "https://hooks.slack.com/services/xxx/yyy/zzz",
+    "slack_webhook_secret_name": "",
     "scheduler_cron": "0 10 * * *"
   }
 }'
 ```
 
-### 3. tfvarsファイルの作成
-
-`tools/`で`generate_tfvars.py`を実行
-
-### 4. gcloudで認証
-
-Terraformを実行する環境（PCやCI/CD）でコマンドを実行
+\# terraform.tfvars
 
 ```bash
-gcloud auth login
-gcloud auth application-default login
-```
+# Generated by generate_tfvars.py - DO NOT EDIT MANUALLY
 
-### 5. terraform apply
+# ==========================================
+# 共通設定 (SaaS 基盤側)
+# ==========================================
+saas_project_id = "ea-agentspacepj"
+region          = "us-central1"
 
-```bash
-cd terraform
-terraform apply
+# ==========================================
+# マルチテナント設定 (マップ 形式)
+# ==========================================
+tenants = {
+  "pacific-legend" = {
+    customer_project_id       = "pacific-legend-634"
+    gcs_bucket_name           = "gemini-query-analyzer-reports"
+    worst_query_limit         = "1"
+    time_range_interval       = "2 DAY"
+    slack_webhook_secret_name = ""
+    scheduler_cron            = "0 9 * * *"
+  }
+  "datatechlab" = {
+    customer_project_id       = "ea-datatechlab"
+    gcs_bucket_name           = "gemini-query-analyzer-reports"
+    worst_query_limit         = "1"
+    time_range_interval       = "2 DAY"
+    slack_webhook_secret_name = ""
+    scheduler_cron            = "0 10 * * *"
+  }
+}
 ```
 
 ## 🗑️ 環境破棄
 
-* `terraform destroy`を成功させるには、事前に以下の２点を済ませておく必要がある
-  * 顧客プロジェクトのバケットの中身を空にする
-  * SaaSプロジェクトのmasterテーブルを削除(`bq rm -r -f -d <saas_project_id>:audit_master`)する
+### 1. `terraform.tfvars`の配置
+
+* 一旦、Github ActionsでRun workflowを実行して生成した環境ファイルをダウンロード
+* `terraform/terrform.tfvars`に配置
+
+### 2. SaaSプロジェクトのmasterテーブルを削除
+
+```bash
+bq rm -r -f -d <saas_project_id>:audit_master
+```
+
+### 3. `terraform destroy`
+
+```bash
+cd terraform
+terraform destroy
+```
 
 ---
 
@@ -192,7 +307,8 @@ gcloud services enable \
     iam.googleapis.com \
     storage.googleapis.com \
     workflows.googleapis.com \
-    artifactregistry.googleapis.com
+    artifactregistry.googleapis.com \
+    secretmanager.googleapis.com
 ```
 
 ### 2. SaaSプロジェクトにサービスアカウントの作成
@@ -224,15 +340,17 @@ SAAS_ROLES=(
     "roles/bigquery.jobUser"
     "roles/bigquery.dataViewer"
     "roles/workflows.invoker"
+    "roles/secretmanager.secretAccessor"
     "roles/run.developer"
     "roles/logging.logWriter"
 )
-# "roles/aiplatform.user"         # Gemini (Vertex AI) の実行権限
-# "roles/bigquery.jobUser"        # Saasプロジェクトでジョブ実行権限（ドライラン実行)
-# "roles/bigquery.dataViewer"     # masterテーブルを閲覧する権限
-# "roles/workflows.invoker"       # workflowsの起動
-# "roles/run.developer"           # cloud run service(api)とJobの呼び出し, workflowsから環境変数セット
-# "roles/logging.logWriter"       # Cloud Runなどからログ書き出し
+# "roles/aiplatform.user"              # Gemini (Vertex AI) の実行権限
+# "roles/bigquery.jobUser"             # Saasプロジェクトでジョブ実行権限（ドライラン実行)
+# "roles/bigquery.dataViewer"          # masterテーブルを閲覧する権限
+# "roles/workflows.invoker"            # workflowsの起動
+# "roles/secretmanager.secretAccessor" # Secret ManagerからSlack Webhook URLの取得
+# "roles/run.developer"                # cloud run service(api)とJobの呼び出し, workflowsから環境変数セット
+# "roles/logging.logWriter"            # Cloud Runなどからログ書き出し
 
 for ROLE in ${SAAS_ROLES[@]}; do
     echo $ROLE
@@ -279,7 +397,7 @@ bq query --use_legacy_sql=false --project_id=${SAAS_PROJECT_ID}
 
 ```bash
 # ==========================================
-# 顧客プロジェクト側への権限付与（分析対象） & GCSバケット作成
+# 顧客プロジェクト側への権限付与（分析対象） & GCSバケットへ権限付与
 # ==========================================
 CUSTOMER_ROLES=(
     "roles/bigquery.metadataViewer"
@@ -287,23 +405,13 @@ CUSTOMER_ROLES=(
 )
 # "roles/bigquery.metadataViewer" # 各テーブルのスキーマやパーティション構成を取得
 # "roles/bigquery.resourceViewer" # INFORMATION_SCHEMA.JOBS からプロジェクト全体のクエリ履歴を取得
-for ROLE in ${CUSTOMER_ROLES[@]}; do
-    echo $ROLE
-done
 
 # 2. jq を使ってテナントのキー（pacific-legend, datatechlab）のリストを取得しループ
 for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
 
     # 3. 各テナントの詳細情報を取得
     CUSTOMER_PROJECT_ID=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".customer_project_id")
-    GCS_BUCKET_PREFIX=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".gcs_bucket_prefix")
-
-    # 4-a. ランダムな4桁の英数字 suffix を生成（方法1）
-    RANDOM_SUFFIX=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
-    # RANDOM_SUFFIX=$(tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
-
-    # 4-b. バケット名の構築
-    BUCKET_NAME="${GCS_BUCKET_PREFIX}-${CUSTOMER_PROJECT_ID}-${RANDOM_SUFFIX}"
+    GCS_BUCKET_NAME=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".gcs_bucket_name")
 
     echo "----------------------------------------"
     echo "Tenant: ${TENANT_KEY}"
@@ -317,14 +425,7 @@ for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
             --condition=None
     done
 
-    # 6. バケットの作成
-    echo "[1/2] Creating bucket: gs://${BUCKET_NAME}..."
-    gcloud storage buckets create "gs://${BUCKET_NAME}" \
-        --project="${CUSTOMER_PROJECT_ID}" \
-        --location="${REGION}"
-
-    # 7. バケットへの権限付与 (Storage オブジェクト管理者)
-    # インタラクティブな確認をスキップ
+    # 6. バケットへの権限付与 (Storage オブジェクト管理者)
     echo "[2/2] Adding IAM policy binding for Service Account..."
     gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
         --member="serviceAccount:${SA_EMAIL}" \
@@ -349,8 +450,8 @@ gcloud run jobs deploy gemini-bq-query-analyzer-job \
     --set-env-vars BQ_ANTIPATTERN_API_URL=${BQ_ANTIPATTERN_API_URL} \
     --set-env-vars CUSTOMER_PROJECT_ID="" \
     --set-env-vars GCS_BUCKET_NAME="" \
-    --set-env-vars TIME_RANGE_INTERVAL="" \
-    --set-env-vars WORST_QUERY_LIMIT=""
+    --set-env-vars WORST_QUERY_LIMIT="" \
+    --set-env-vars TIME_RANGE_INTERVAL=""
 
     # --set-env-vars TIME_RANGE_START=${TIME_RANGE_START} \
     # --set-env-vars TIME_RANGE_END=${TIME_RANGE_END}
@@ -383,28 +484,21 @@ for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
 
     # テナント情報の抽出
     CUSTOMER_PROJECT_ID=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".customer_project_id")
+    BUCKET_NAME=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".gcs_bucket_name")
     WORST_LIMIT=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".worst_query_limit")
     INTERVAL=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".time_range_interval")
+    WEBHOOK=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".slack_webhook_secret_name")
     CRON=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".scheduler_cron")
-    WEBHOOK=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".slack_webhook_url")
-    BUCKET_PREFIX=$(echo "$TENANTS_JSON" | jq -r ".\"$TENANT_KEY\".gcs_bucket_prefix")
-
-    # ここでは既存バケットを検索して特定します
-    ACTUAL_BUCKET=$(
-        gcloud storage buckets list \
-            --project=${CUSTOMER_PROJECT_ID} \
-            --format="value(name)" | grep "${BUCKET_PREFIX}-${CUSTOMER_PROJECT_ID}" \
-    )
 
     # Workflowに渡す引数のJSONを構築
     ARGUMENT=$(jsonencode_args=$(jq -n \
-        --arg cid "$TENANT_KEY" \
+        --arg tid "$TENANT_KEY" \
         --arg cpid "$CUSTOMER_PROJECT_ID" \
-        --arg bkt "$ACTUAL_BUCKET" \
+        --arg bkt "$BUCKET_NAME" \
         --arg limit "$WORST_LIMIT" \
         --arg interval "$INTERVAL" \
         --arg webhook "$WEBHOOK" \
-        '{customer_id: $cid, customer_project_id: $cpid, gcs_bucket_name: $bkt, worst_query_limit: $limit, time_range_interval: $interval, slack_webhook_url: $webhook}')
+        '{tenant_id: $tid, customer_project_id: $cpid, gcs_bucket_name: $bkt, worst_query_limit: $limit, time_range_interval: $interval, slack_webhook_secret_name: $webhook}')
         echo "{\"argument\": $(echo $jsonencode_args | jq -Rs .)}")
 
     # Schedulerジョブの作成
@@ -425,3 +519,21 @@ done
 
 * `.env` ファイルの読み込み仕様について
   * 当プロジェクトでは、インフラ（Terraform）、メインバッチ（`main-app/`）、API（`bq-antipattern-api/`）をひとつのリポジトリで管理するモノレポ構成を採用しており`.env`ファイルは両方から参照します。
+
+* バケットを作成する場合
+
+```bash
+
+# 4-a. ランダムな4桁の英数字 suffix を生成（方法1）
+RANDOM_SUFFIX=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
+# RANDOM_SUFFIX=$(tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
+
+# 4-b. バケット名の構築
+BUCKET_NAME="${GCS_BUCKET_NAME}-${CUSTOMER_PROJECT_ID}-${RANDOM_SUFFIX}"
+
+# 6. バケットの作成
+echo "[1/2] Creating bucket: gs://${BUCKET_NAME}..."
+gcloud storage buckets create "gs://${BUCKET_NAME}" \
+    --project="${CUSTOMER_PROJECT_ID}" \
+    --location="${REGION}"
+```

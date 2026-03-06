@@ -7,25 +7,20 @@
 * `gcloud auth login`
 * terraform 実行者のアカウントに必要なロール(要検証)
 
-1. PROJECT:
-   1. SAAS_PROJECT
-      1. IAMロール:(編集者またはオーナーが早い)
-         1. Project IAM 管理者`roles/resourcemanager.projectIamAdmin`(IAMロールを付与する権限)
-         2. Service Usage Admin`roles/serviceusage.serviceUsageAdmin`(APIを有効化)
-         3. Cloud Build 編集者`roles/cloudbuild.builds.editor`(Cloud Build を実行する権限)
-         4. Artifact Registry 管理者`roles/artifactregistry.admin`(Dockerリポジトリの作成および削除)
-         5. サービス アカウント 管理者`roles/iam.serviceAccountAdmin`(サービスアカウント作成および削除)
-         6. Storage 管理者`roles/storage.Admin`(tfstateファイルを格納するBackendバケット作成)
-         7. BigQuery データ管理者`roles/bigquery.dataOwner`(BigQueryのデータセットとテーブルを作成および削除)
-         8. BigQuery ジョブユーザー`roles/bigquery.jobUser`(BigQueryのテーブル読み取り,DDL実行)
-         9. Cloud Scheduler 管理者`roles/cloudscheduler.admin`(ジョブの作成および削除)
-         10. Workflows 編集者`roles/workflows.editor`(workflowの作成および削除)
-         11. Cloud Run 開発者`roles/run.developer`(Cloud Runサービスやジョブの作成および削除)
-         12. ログ書き込み`roles/logging.logWriter`(ログエントリ作成)
-   2. CUTOMER_PROJECT
-      1. IAMロール:
-         1. Project IAM 管理者`roles/resourcemanager.projectIamAdmin`(IAMロールを付与する権限)
-         2. Storage 管理者`roles/storage.Admin`(分析結果ファイルを格納するバケット作成および削除)
+1. SAAS_PROJECT
+  1. IAMロール:(編集者またはオーナーが早い)
+     1. Project IAM 管理者`roles/resourcemanager.projectIamAdmin`(IAMロールを付与する権限)
+     2. Service Usage Admin`roles/serviceusage.serviceUsageAdmin`(APIを有効化)
+     3. Cloud Build 編集者`roles/cloudbuild.builds.editor`(Cloud Build を実行する権限)
+     4. Artifact Registry 管理者`roles/artifactregistry.admin`(Dockerリポジトリの作成および削除)
+     5. サービス アカウント 管理者`roles/iam.serviceAccountAdmin`(サービスアカウント作成および削除)
+     6. Storage 管理者`roles/storage.Admin`(tfstateファイルを格納するBackendバケット作成)
+     7. BigQuery データ管理者`roles/bigquery.dataOwner`(BigQueryのデータセットとテーブルを作成および削除)
+     8. BigQuery ジョブユーザー`roles/bigquery.jobUser`(BigQueryのテーブル読み取り,DDL実行)
+     9. Cloud Scheduler 管理者`roles/cloudscheduler.admin`(ジョブの作成および削除)
+     10. Workflows 編集者`roles/workflows.editor`(workflowの作成および削除)
+     11. Cloud Run 開発者`roles/run.developer`(Cloud Runサービスやジョブの作成および削除)
+     12. ログ書き込み`roles/logging.logWriter`(ログエントリ作成)
 
 ## 2. 環境構築
 
@@ -36,6 +31,18 @@
 
 ### 2-2. `.env`ファイルを設定
 
+### 2-2. スプレッドシート`Gemini-BQ-Query-Analyzer-Tenant-Master`の更新
+
+予め下記の項目を設定する
+
+* tenant_id
+* customer_project_id
+* gcs_bucket_name(顧客に作成してもらい、バケット名を聞く)
+* worst_query_limit
+* time_range_interval
+* slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
+* scheduler_cron
+
 例:
 
 ```bash
@@ -44,7 +51,6 @@
 # ==========================================
 SAAS_PROJECT_ID="saas_project-id"
 REGION="us-central1"
-# terraformが動的に取得するため不要↓
 # BQ_ANTIPATTERN_API_URL=https://bq-antipattern-api-<saas_project_number>.<region>.run.app
 
 # ==========================================
@@ -55,26 +61,28 @@ REGION="us-central1"
 TENANTS_JSON='{
   "tenant1": {
     "customer_project_id": "tenant1_project_id",
+    "gcs_bucket_name": "gemini-query-analyzer-reports",
     "worst_query_limit": "1",
     "time_range_interval": "1 DAY",
-    "gcs_bucket_prefix": "gemini-query-analyzer-reports",
-    "slack_webhook_url": "https://hooks.slack.com/services/xxx/yyy/zzz",
+    "slack_webhook_secret_name": "https://hooks.slack.com/services/xxx/yyy/zzz",
     "scheduler_cron": "0 9 * * *"
   },
   "tenant2": {
     "customer_project_id": "tenant2_project_id",
+    "gcs_bucket_name": "gemini-query-analyzer-reports",
     "worst_query_limit": "1",
     "time_range_interval": "2 DAY",
-    "gcs_bucket_prefix": "gemini-query-analyzer-reports",
-    "slack_webhook_url": "https://hooks.slack.com/services/xxx/yyy/zzz",
+    "slack_webhook_secret_name": "https://hooks.slack.com/services/xxx/yyy/zzz",
     "scheduler_cron": "0 10 * * *"
   }
 }'
 ```
 
-### 2-3. tfvarsファイルの作成
+### 2-3. .envファイルとtfvarsファイルの作成
 
-`tools/`で`generate_tfvars.py`を実行
+### 2-3. Github Actionsトリガーの手動実行
+
+`base_config.ini`とスプレッドシートを読み込み、`.env`ファイルと`terraform.tfvars`が作成される
 
 ### 2-4. gcloudで認証
 

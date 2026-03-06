@@ -58,9 +58,17 @@ main:
             initial_delay: 2
             max_delay: 10
             multiplier: 2
+    - get_slack_url:
+        call: googleapis.secretmanager.v1.projects.secrets.versions.access
+        args:
+          name: $${"projects/" + project_id + "/secrets/" + arg.slack_webhook_secret_name + "/versions/latest"}
+        result: secret_response
+    - decode_slack_url:
+        assign:
+          - slack_url: $${text.decode(base64.decode(secret_response.payload.data))}
     - notify_slack:
         call: http.post
         args:
-          url: $${arg.slack_webhook_url}
+          url: $${slack_url}
           body:
-            text: $${"✅ BQ分析完了 [" + arg.customer_id + "]\n" + report_json.text_summary}
+            text: $${"✅ BQ分析完了 [" + arg.tenant_id + "]\n" + report_json.body.text_summary}

@@ -20,3 +20,4 @@ provider "google" {
   project = var.saas_project_id
   region  = var.region
 }
+
