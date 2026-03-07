@@ -8,10 +8,13 @@ resource "null_resource" "build_api_image" {
 
   provisioner "local-exec" {
     command = <<EOT
+      # 1. GCSからローカルのディレクトリにJARファイルをダウンロード
+      gcloud storage cp gs://bigquery-antipattern-recognition-for-bq-analyzer-api-9klp \
+        /bigquery-antipattern-recognition.jar ../bq-antipattern-api/
+      # 2. ダウンロードしたJARを含めてCloud Buildでビルド
       gcloud builds submit ../bq-antipattern-api \
         --tag ${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/bq-antipattern-api:latest \
-        --project ${var.saas_project_id} \
-        --build-arg BUCKET_NAME=bigquery-antipattern-recognition-for-bq-analyzer-api-9klp
+        --project ${var.saas_project_id}
     EOT
   }
 
