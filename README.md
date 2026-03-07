@@ -131,22 +131,20 @@ Terraform実行用サービスアカウントに必要なIAMロール
 
 \# プロジェクトレベル
 
-1. Project IAM 管理者`roles/resourcemanager.projectIamAdmin`(IAMロールを付与する権限)
-2. Service Usage Admin`roles/serviceusage.serviceUsageAdmin`(APIを有効化)
-3. Cloud Build 編集者`roles/cloudbuild.builds.editor`(Cloud Build を実行する権限)
-4. Artifact Registry 管理者`roles/artifactregistry.admin`(Dockerリポジトリの作成および削除)
-5. サービス アカウント 管理者`roles/iam.serviceAccountAdmin`(サービスアカウント作成および削除)
-6. BigQuery データ管理者`roles/bigquery.dataOwner`(BigQueryのデータセットとテーブルを作成および削除)
-7. BigQuery ジョブユーザー`roles/bigquery.jobUser`(BigQueryのテーブル読み取り,DDL実行)
-8. Cloud Scheduler 管理者`roles/cloudscheduler.admin`(ジョブの作成および削除)
-9. Workflows 編集者`roles/workflows.editor`(workflowの作成および削除)
-10. Secret Manager Viewer`roles/secretmanager.viewer`(Slack Webhook URLの確認)
-11. Cloud Run 開発者`roles/run.developer`(Cloud Runサービスやジョブの作成および削除)
+1. Artifact Registry 管理者`roles/artifactregistry.admin`(Dockerリポジトリの作成および削除)
+2. BigQuery データ管理者`roles/bigquery.dataOwner`(BigQueryのデータセットとテーブルを作成および削除)
+3. BigQuery ジョブユーザー`roles/bigquery.jobUser`(BigQueryのテーブル読み取り,DDL実行)
+4. Cloud Build 編集者`roles/cloudbuild.builds.editor`(Cloud Build を実行する権限)
+5. Cloud Run 開発者`roles/run.developer`(Cloud Runサービスやジョブの作成および削除)
+6. Project IAM 管理者`roles/resourcemanager.projectIamAdmin`(IAMロールを付与する権限)
+7. Service Usage Admin`roles/serviceusage.serviceUsageAdmin`(APIを有効化)
+8. サービス アカウント ユーザー`roles/iam.serviceAccountUser`(Cloud Buildの実行,Workflowsへの紐付け)
+9. サービス アカウント 管理者`roles/iam.serviceAccountAdmin`(サービスアカウント作成および削除)
+10. Storage 管理者`roles/storage.Admin`(tfstateファイルを格納するBackendバケットに書き込み)
+11. Cloud Scheduler 管理者`roles/cloudscheduler.admin`(ジョブの作成および削除)
 12. ログ書き込み`roles/logging.logWriter`(ログエントリ作成)
-
-\# GCSバケット
-
-1. Storage 管理者`roles/storage.Admin`(tfstateファイルを格納するBackendバケットに書き込み)
+13. Workflows 編集者`roles/workflows.editor`(workflowの作成および削除)
+14. 閲覧者`roles/viewer`(Secret ManagerのSlack Webhook URLの確認, ビルドログの確認など)
 
 Terraform実行用のサービスアカウント作成
 
@@ -159,18 +157,20 @@ gcloud iam service-accounts create terraform-deployer-sa \
     --project=${saas_project_id}
 
 ROLES=(
-    "roles/resourcemanager.projectIamAdmin"
-    "roles/serviceusage.serviceUsageAdmin"
-    "roles/cloudbuild.builds.editor"
     "roles/artifactregistry.admin"
-    "roles/iam.serviceAccountAdmin"
     "roles/bigquery.dataOwner"
     "roles/bigquery.jobUser"
-    "roles/cloudscheduler.admin"
-    "roles/workflows.editor"
-    "roles/secretmanager.viewer"
+    "roles/cloudbuild.builds.editor"
     "roles/run.developer"
+    "roles/resourcemanager.projectIamAdmin"
+    "roles/serviceusage.serviceUsageAdmin"
+    "roles/iam.serviceAccountUser"
+    "roles/iam.serviceAccountAdmin"
+    "roles/storage.Admin"
+    "roles/cloudscheduler.admin"
     "roles/logging.logWriter"
+    "roles/workflows.editor"
+    "roles/viewer"
 )
 
 SA_EMAIL="terraform-deployer-sa@${saas_project_id}.iam.gserviceaccount.com"
@@ -185,13 +185,6 @@ for ROLE in "${ROLES[@]}"; do
         --role="${ROLE}" \
         --no-user-output-enabled
 done
-
-# 特定のバケットに限定して権限を付与する場合（推奨）
-# [注意]tfstateバケットだけでなくjarファイルを格納しているバケットにも権限を付与する
-gcloud storage buckets add-iam-policy-binding gs://${tfstate_bucket_name} \
-    --member="serviceAccount:${SA_EMAIL} \
-    --role="roles/storage.objectAdmin" \
-    --no-user-output-enabled
 
 echo "IAM policy binding completed."
 ```
