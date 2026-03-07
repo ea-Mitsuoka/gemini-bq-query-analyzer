@@ -142,6 +142,7 @@ Terraform実行用サービスアカウントに必要なIAMロール
 Terraform実行用のサービスアカウント作成
 
 ```bash
+# 環境変数設定
 export $(grep -v '^\[.*\]' base_config.ini | sed 's/ *= */=/g' | xargs)
 
 gcloud iam service-accounts create terraform-deployer-sa \
