@@ -14,8 +14,7 @@ resource "null_resource" "build_api_image" {
       # 2. ダウンロードしたJARを含めてCloud Buildでビルド
       gcloud builds submit ../bq-antipattern-api \
         --tag ${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/bq-antipattern-api:latest \
-        --project ${var.saas_project_id} \
-        --suppress-logs
+        --project ${var.saas_project_id}
     EOT
   }
 
