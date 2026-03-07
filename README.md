@@ -102,6 +102,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 * tfstateファイルを格納するGCSバケットを作成しておく必要があります。
 * 置換変数の整合性: gemini_prompt.txt 内で使用する変数（{query} や {billed_gb} など）が、Python コード側で定義した辞書のキーと完全に一致している必要があります。
+* Spread Sheet APIを有効化`gcloud services enable sheets.googleapis.com --project=<saas_project_id>`
 
 ---
 
@@ -199,7 +200,7 @@ echo "IAM policy binding completed."
 
 * tenant_id
 * customer_project_id
-* gcs_bucket_name(予め顧客に作成してもらい、バケット名を聞く)
+* gcs_bucket_name([注意⚠️]予め顧客に作成してもらい、バケット名を聞く)
 * worst_query_limit
 * time_range_interval
 * slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
