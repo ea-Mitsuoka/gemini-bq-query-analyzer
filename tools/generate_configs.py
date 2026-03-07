@@ -4,16 +4,44 @@ import configparser
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
-# 設定パスの定義
+# --- 設定パスの定義 ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE_CONFIG_INI = os.path.join(BASE_DIR, "base_config.ini")
 ENV_PATH = os.path.join(BASE_DIR, ".env")
-# terraformディレクトリが存在しない場合に備えて作成
 TFVARS_DIR = os.path.join(BASE_DIR, "terraform")
 TFVARS_PATH = os.path.join(TFVARS_DIR, "terraform.tfvars")
 
+# --- スプレッドシート設定（定数） ---
+SHEET_NAME = "Sheet1"  # 実際のシート名に合わせて変更してください
+START_ROW = 1          # ヘッダー行
+DATA_START_ROW = 2     # データ開始行
+
+def get_dynamic_range(service, spreadsheet_id):
+    """ヘッダーを走査して動的に読み取り範囲（列）を決定する"""
+    # 1行目を広めに取得してヘッダーを確認
+    header_range = f"{SHEET_NAME}!A1:Z1"
+    result = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id, range=header_range
+    ).execute()
+
+    headers = result.get("values", [[]])[0]
+
+    # 空白が見つかるまでの列数をカウント
+    valid_column_count = 0
+    for header in headers:
+        if not header or header.strip() == "":
+            break
+        valid_column_count += 1
+
+    if valid_column_count == 0:
+        raise ValueError("ヘッダーが見つかりませんでした。A1セルから入力されているか確認してください。")
+
+    # 列インデックスを記号（A, B, C...）に変換
+    last_col_letter = chr(64 + valid_column_count)
+    return f"{SHEET_NAME}!A{DATA_START_ROW}:{last_col_letter}", valid_column_count
+
 def main():
-    # 1. base_config.ini (SaaS基盤共通設定) の読み込み
+    # 1. base_config.ini の読み込み
     if not os.path.exists(BASE_CONFIG_INI):
         print(f"エラー: {BASE_CONFIG_INI} が見つかりません。")
         return
@@ -44,13 +72,14 @@ def main():
     )
     service = build("sheets", "v4", credentials=creds)
 
-    # A2からG列までを取得 (ヘッダーを除外)
-    # カラム順: tenant_id, customer_project_id, gcs_bucket_name, worst_query_limit, 
-    #          time_range_interval, slack_webhook_secret_name, scheduler_cron
-    range_name = "Sheet1!A2:G"
     try:
+        # 動的に範囲を取得
+        read_range, col_count = get_dynamic_range(service, spreadsheet_id)
+        print(f"解析された読み取り範囲: {read_range} (列数: {col_count})")
+
+        # データの取得
         result = service.spreadsheets().values().get(
-            spreadsheetId=spreadsheet_id, range=range_name
+            spreadsheetId=spreadsheet_id, range=read_range
         ).execute()
         rows = result.get("values", [])
     except Exception as e:
@@ -59,25 +88,25 @@ def main():
 
     tenants = {}
     for row in rows:
-        # 必要なカラムが揃っていない行はスキップ
-        if len(row) < 7:
+        # 判定された列数に満たない行は不完全データとしてスキップ 
+        if len(row) < col_count:
             continue
 
         t_id = row[0]
+        # カラム順序が固定であることを前提としたマッピング
         tenants[t_id] = {
             "customer_project_id":       row[1],
-            "gcs_bucket_name":           row[2], # 顧客側で作成済みのバケット名
+            "gcs_bucket_name":           row[2],
             "worst_query_limit":         row[3],
             "time_range_interval":       row[4],
             "slack_webhook_secret_name": row[5],
             "scheduler_cron":            row[6]
         }
 
-    # 3. .env の書き出し (ローカルデプロイやログ確認用)
+    # 3. .env の書き出し
     with open(ENV_PATH, "w", encoding='utf-8') as f:
         f.write(f'SAAS_PROJECT_ID="{saas_id}"\n')
         f.write(f'REGION="{region}"\n')
-        # JSON形式でテナント情報を1行にまとめる
         f.write(f"TENANTS_JSON='{json.dumps(tenants, ensure_ascii=False)}'\n")
 
     # 4. terraform.tfvars の書き出し
@@ -88,18 +117,15 @@ def main():
         f.write("# Generated from base_config.ini and Spreadsheet - DO NOT EDIT\n\n")
         f.write(f'saas_project_id = "{saas_id}"\n')
         f.write(f'region          = "{region}"\n\n')
-
         f.write("tenants = {\n")
         for tid, cfg in tenants.items():
             f.write(f'  "{tid}" = {{\n')
-            # 各項目の書き出し
             for k, v in cfg.items():
                 f.write(f'    {k:<25} = "{v}"\n')
             f.write("  }\n")
         f.write("}\n")
 
-    print(f"完了: SaaSプロジェクト '{saas_id}' 用のコンフィグを生成しました。")
-    print(f"処理テナント数: {len(tenants)}")
+    print(f"完了: 処理テナント数: {len(tenants)}")
 
 if __name__ == "__main__":
     main()
