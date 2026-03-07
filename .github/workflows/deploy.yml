@@ -47,17 +47,18 @@ jobs:
       - name: Terraform Init & Apply
         shell: bash
         env:
-          # JSON文字列をそのまま渡す
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
-          # JSONを一時ファイルに保存
+          # 1. JSONを一時ファイルに保存
           echo "$GOOGLE_CREDENTIALS_JSON" > "${{ github.workspace }}/gcp-key.json"
 
-          # 環境変数としてファイルの絶対パスを指定
+          # 2. 環境変数のセット（Terraform本体用）
           export GOOGLE_APPLICATION_CREDENTIALS="${{ github.workspace }}/gcp-key.json"
 
+          # 3. 【追加】gcloud / bq コマンド用の認証
+          gcloud auth activate-service-account --key-file="${{ github.workspace }}/gcp-key.json"
+
+          # 4. Terraformの実行
           cd terraform
           terraform init
-
-          # apply実行。内部のlocal-execが上記環境変数を自動で読み取る
           terraform apply -auto-approve

@@ -10,7 +10,7 @@ resource "null_resource" "build_api_image" {
     command = <<EOT
       gcloud builds submit ../bq-antipattern-api \
         --tag ${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/bq-antipattern-api:latest \
-        --project ${var.saas_project_id}
+        --project ${var.saas_project_id} \
         --build-arg BUCKET_NAME=bigquery-antipattern-recognition-for-bq-analyzer-api-9klp
     EOT
   }
