@@ -3,7 +3,7 @@ resource "null_resource" "build_api_image" {
   # ソースコードやJARファイルが変更されたら再実行
   triggers = {
     src_hash = sha256(file("${path.module}/../bq-antipattern-api/app.py"))
-    jar_hash = filesha256("${path.module}/../bq-antipattern-api/bigquery-antipattern-recognition.jar")
+    docker_hash = sha256(file("${path.module}/../bq-antipattern-api/Dockerfile"))
   }
 
   provisioner "local-exec" {
