@@ -107,7 +107,7 @@ def main():
     with open(ENV_PATH, "w", encoding='utf-8') as f:
         f.write(f'SAAS_PROJECT_ID="{saas_id}"\n')
         f.write(f'REGION="{region}"\n')
-        f.write(f"TENANTS_JSON='{json.dumps(tenants, ensure_ascii=False)}'\n")
+        f.write(f"TENANTS_JSON='{json.dumps(tenants, ensure_ascii=False, indent=2)}'\n")
 
     # 4. terraform.tfvars の書き出し
     if not os.path.exists(TFVARS_DIR):
