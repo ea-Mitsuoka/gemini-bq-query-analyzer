@@ -308,6 +308,7 @@ terraform destroy
 
 ```bash
 gcloud services enable \
+    sheets.googleapis.com \
     aiplatform.googleapis.com \
     run.googleapis.com \
     cloudbuild.googleapis.com \
