@@ -7,7 +7,7 @@ from google.oauth2 import service_account
 # --- 設定パスの定義 ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE_CONFIG_INI = os.path.join(BASE_DIR, "base_config.ini")
-ENV_PATH = os.path.join(BASE_DIR, ".env")
+ENV_PATH = os.path.join(BASE_DIR, "env.txt")
 TFVARS_DIR = os.path.join(BASE_DIR, "terraform")
 TFVARS_PATH = os.path.join(TFVARS_DIR, "terraform.tfvars")
 

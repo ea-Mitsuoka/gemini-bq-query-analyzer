@@ -35,7 +35,7 @@ jobs:
         with:
           name: deployment-configs
           path: |
-            .env
+            env.txt
             terraform/terraform.tfvars
           retention-days: 1
 
