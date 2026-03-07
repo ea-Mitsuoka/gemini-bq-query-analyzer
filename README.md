@@ -187,10 +187,11 @@ for ROLE in "${ROLES[@]}"; do
 done
 
 # 特定のバケットに限定して権限を付与する場合（推奨）
+# [注意]tfstateバケットだけでなくjarファイルを格納しているバケットにも権限を付与する
 gcloud storage buckets add-iam-policy-binding gs://${tfstate_bucket_name} \
     --member="serviceAccount:${SA_EMAIL} \
     --role="roles/storage.objectAdmin" \
-      --no-user-output-enabled
+    --no-user-output-enabled
 
 echo "IAM policy binding completed."
 ```
