@@ -120,7 +120,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 sed -i '' "s/<saas_project_id>/$(gcloud config get-value project)/g" base_config.ini
 ```
 
-### 1. GCSバケットを作成(初回のみ)
+### 1. GCSバケットを作成
 
 \# tfstateファイル格納用
 
@@ -272,7 +272,7 @@ gcloud storage cp bq-antipattern-api/bigquery-antipattern-recognition.jar gs://$
 
 * GitHub リポジトリの Actions タブに移動
 * 左側のメニューから Manual Deploy from Spreadsheet（または設定したワークフロー名）を選択
-* Run workflow ボタンをクリックして実行
+* `deploy`ブランチを選択し、Run workflow ボタンをクリックして実行
   * `terraform apply`まで実行される
 
 ### 4. 生成ファイルの確認とダウンロード
