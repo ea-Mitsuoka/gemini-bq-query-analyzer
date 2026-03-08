@@ -13,6 +13,7 @@ backend.tf
 tools/token.json
 client_secrets.json
 .venv
+env.txt
 
 # Automatically created terraform files
 

@@ -112,7 +112,7 @@ def main():
         f.write("# 共通設定 (SaaS 基盤側)\n")
         f.write("# ==========================================\n")
         f.write(f'SAAS_PROJECT_ID="{saas_id}"\n')
-        f.write(f'REGION="{region}"\n\n')
+        f.write(f'REGION="{region}"\n')
         f.write(f'API_JAR_BUCKET="{api_jar_bucket}"\n\n')
 
         f.write("# ==========================================\n")
@@ -130,7 +130,7 @@ def main():
         f.write("# 共通設定 (SaaS 基盤側)\n")
         f.write("# ==========================================\n")
         f.write(f'saas_project_id     = "{saas_id}"\n')
-        f.write(f'region              = "{region}"\n\n')
+        f.write(f'region              = "{region}"\n')
         f.write(f'api_jar_bucket_name = "{api_jar_bucket}"\n\n')
 
         f.write("# ==========================================\n")

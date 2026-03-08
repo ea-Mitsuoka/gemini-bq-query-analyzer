@@ -106,6 +106,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 * tfstateファイルを格納するGCSバケットを作成しておく必要があります。
 * 置換変数の整合性: gemini_prompt.txt 内で使用する変数（{query} や {billed_gb} など）が、Python コード側で定義した辞書のキーと完全に一致している必要があります。
+* `gcloud auth login`と`gcloud auth application-default login`を先に済ませておく
 * Spread Sheet APIを有効化`gcloud services enable sheets.googleapis.com --project=<saas_project_id>`
 
 ---
@@ -171,7 +172,7 @@ cat base_config.ini
 
 # 4. 更新をGithubにpush
 git add base_config.ini
-git push origin main
+git push origin deploy
 ```
 
 ### 3. Terraform実行用のサービスアカウント作成
@@ -199,9 +200,8 @@ gcloud iam service-accounts create terraform-deployer-sa \
 | 9 | サービス アカウント 管理者 | roles/iam.serviceAccountAdmin | サービスアカウント作成および削除 |
 | 10 | Storage 管理者 | roles/storage.Admin | tfstateファイルを格納するBackendバケットに書き込み |
 | 11 | Cloud Scheduler 管理者 | roles/cloudscheduler.admin | ジョブの作成および削除 |
-| 12 | ログ書き込み | roles/logging.logWriter | ログエントリ作成 |
-| 13 | Workflows 編集者 | roles/workflows.editor | workflowの作成および削除 |
-| 14 | 閲覧者 | roles/viewer | Secret ManagerのSlack Webhook URLの確認, ビルドログの確認など |
+| 12 | Workflows 編集者 | roles/workflows.editor | workflowの作成および削除 |
+| 13 | 閲覧者 | roles/viewer | Secret ManagerのSlack Webhook URLの確認, ビルドログの確認など |
 
 ```bash
 ROLES=(
@@ -219,7 +219,6 @@ ROLES=(
     "roles/workflows.editor"
     "roles/viewer"
 )
-    # "roles/logging.logWriter"
 
 SA_EMAIL="terraform-deployer-sa@${saas_project_id}.iam.gserviceaccount.com"
 
@@ -287,8 +286,9 @@ Manual Deploy from Spreadsheet > Summary > deployment-configs > ↓
 # ==========================================
 # 共通設定 (SaaS 基盤側)
 # ==========================================
-SAAS_PROJECT_ID="saas_project-id"
+SAAS_PROJECT_ID=<saas_project_id>
 REGION="us-central1"
+API_JAR_BUCKET=<api_jar_bucket_name>
 
 # ==========================================
 # マルチテナント設定 (JSON 形式)
@@ -353,7 +353,7 @@ tenants = {
 terraform {
   backend "gcs" {
     bucket = "<NEW_TFSTATE_BUCKET>"
-     prefix = "terraform/state"
+    prefix = "terraform/state"
   }
 }
 ```
