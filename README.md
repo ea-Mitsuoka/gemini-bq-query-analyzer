@@ -106,21 +106,28 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 * tfstateファイルを格納するGCSバケットを作成しておく必要があります。
 * 置換変数の整合性: gemini_prompt.txt 内で使用する変数（{query} や {billed_gb} など）が、Python コード側で定義した辞書のキーと完全に一致している必要があります。
-* `gcloud auth login`と`gcloud auth application-default login`を先に済ませておく
 * Spread Sheet APIを有効化`gcloud services enable sheets.googleapis.com --project=<saas_project_id>`
 
 ---
 
-## ☁️ 環境構築: 共通
+## ☁️ 環境構築: Terraform編
 
-### 1. Project IDを環境ファイルに設定
+### 1. gcloud SDKの認証
+
+```bash
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project <saas_project_id>
+```
+
+### 2. Project IDを`base_config.ini`ファイルに設定
 
 ```bash
 # 環境変数設定
 sed -i '' "s/<saas_project_id>/$(gcloud config get-value project)/g" base_config.ini
 ```
 
-### 1. GCSバケットを作成
+### 3. GCSバケットを作成
 
 \# tfstateファイル格納用
 
@@ -156,7 +163,7 @@ gcloud storage buckets create "gs://${NEW_API_JAR_BUCKET}" \
     --location=${region}
 ```
 
-### 2. `base_config.ini`ファイルを設定
+### 4. GCSバケット名を`base_config.ini`ファイルに設定
 
 ```bash
 # tfstateバケット名
@@ -175,7 +182,18 @@ git add base_config.ini
 git push origin deploy
 ```
 
-### 3. Terraform実行用のサービスアカウント作成
+### 5. BigQuery Antipattern Recognitionツールをダウンロード
+
+* [Github](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases)から`bigquery-antipattern-recognition.jar`をダウンロード
+* ローカルで実行することも考慮して`bq-antipattern-api/`に`bigquery-antipattern-recognition.jar`を配置
+
+### 6. BigQuery Antipattern RecognitionツールをGCSへ格納
+
+```bash
+gcloud storage cp bq-antipattern-api/bigquery-antipattern-recognition.jar gs://${NEW_API_JAR_BUCKET}/
+```
+
+### 7. Terraformのサービスアカウント作成
 
 ```bash
 # ワークロード実行用
@@ -189,9 +207,9 @@ gcloud iam service-accounts create terraform-deployer-sa \
     --project=${saas_project_id}
 ```
 
-### 4.Terraform実行用のサービスアカウントにIAMロール付与
+### 8.Terraform実行用のサービスアカウントにIAMロール付与
 
-\# Terraform実行用サービスアカウントに必要なIAMロール [⚠️]ログ書き込みが不要な可能性あり要検証
+\# Terraform実行用サービスアカウントに必要なIAMロール
 
 | 行番号 | 表示名 | ロール識別子 | 利用目的 |
 | :--- | :--- | :--- | :--- |
@@ -242,7 +260,7 @@ done
 echo "IAM policy binding completed."
 ```
 
-### 5. 顧客情報のスプレッドシート`Gemini-BQ-Query-Analyzer-Tenant-Master`を準備
+### 9. 顧客情報のスプレッドシート`Gemini-BQ-Query-Analyzer-Tenant-Master`を準備
 
 下記の項目を設定する
 
@@ -254,34 +272,21 @@ echo "IAM policy binding completed."
 * slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
 * scheduler_cron
 
-### 6. Github ActionsのSercretを登録
+### 10. Github ActionsのSercretを登録
 
 Setteings > Secrets and variables > Actions > New repositry secret
 
 * GOOGLE_CREDENTIALS: 作成したTerraform実行用サービスアカウントのJSONキー
 * SPREADSHEET_ID: 顧客情報スプレッドシートのID
 
-## ☁️ 環境構築: Terraform編
-
-### 1. BigQuery Antipattern Recognitionツールをダウンロード
-
-* [Github](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases)から`bigquery-antipattern-recognition.jar`をダウンロード
-* ローカルで実行することも考慮して`bq-antipattern-api/`に`bigquery-antipattern-recognition.jar`を配置
-
-### 2. BigQuery Antipattern RecognitionツールをGCSへ格納
-
-```bash
-gcloud storage cp bq-antipattern-api/bigquery-antipattern-recognition.jar gs://${NEW_API_JAR_BUCKET}/
-```
-
-### 3. Github Actionsの手動実行
+### 11. Github Actionsの手動実行
 
 * GitHub リポジトリの Actions タブに移動
 * 左側のメニューから Manual Deploy from Spreadsheet（または設定したワークフロー名）を選択
 * `deploy`ブランチを選択し、Run workflow ボタンをクリックして実行
   * `terraform apply`まで実行される
 
-### 4. 生成ファイルの確認とダウンロード
+### 12. 生成ファイルの確認とダウンロード
 
 Manual Deploy from Spreadsheet > Summary > deployment-configs > ↓
 
