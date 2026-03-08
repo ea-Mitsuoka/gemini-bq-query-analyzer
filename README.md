@@ -104,7 +104,6 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 ## 🛑 前提条件
 
-* tfstateファイルを格納するGCSバケットを作成しておく必要があります。
 * 置換変数の整合性: gemini_prompt.txt 内で使用する変数（{query} や {billed_gb} など）が、Python コード側で定義した辞書のキーと完全に一致している必要があります。
 * Spread Sheet APIを有効化`gcloud services enable sheets.googleapis.com --project=<saas_project_id>`
 
