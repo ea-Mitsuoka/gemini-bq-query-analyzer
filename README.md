@@ -320,8 +320,9 @@ TENANTS_JSON='{
 # ==========================================
 # 共通設定 (SaaS 基盤側)
 # ==========================================
-saas_project_id = "ea-agentspacepj"
-region          = "us-central1"
+saas_project_id     = "<saas_project_id>"
+region              = "us-central1"
+api_jar_bucket_name = "<api_jar_bucket_name>"
 
 # ==========================================
 # マルチテナント設定 (マップ 形式)
