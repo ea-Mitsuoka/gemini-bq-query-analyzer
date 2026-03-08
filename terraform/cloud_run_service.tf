@@ -9,7 +9,7 @@ resource "null_resource" "build_api_image" {
   provisioner "local-exec" {
     command = <<EOT
       # 1. GCSからローカルのディレクトリにJARファイルをダウンロード
-      gcloud storage cp gs://bigquery-antipattern-recognition-for-bq-analyzer-api-9klp/bigquery-antipattern-recognition.jar ../bq-antipattern-api/
+      gcloud storage cp gs://${var.api_jar_bucket}/bigquery-antipattern-recognition.jar ../bq-antipattern-api/
 
       # 2. ダウンロードしたJARを含めてCloud Buildでビルド
       gcloud builds submit ../bq-antipattern-api \

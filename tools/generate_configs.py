@@ -54,6 +54,7 @@ def main():
         saas_id = config['gcp']['saas_project_id']
         region = config['gcp']['region']
         tfstate_bucket = config['gcp']['tfstate_bucket_name'] # ←これを追加
+        api_jar_bucket = config['gcp']['api_jar_bucket_name'] # ←これを追加
     except KeyError as e:
         print(f"エラー: base_config.ini の設定項目が不足しています: {e}")
         return
@@ -112,6 +113,7 @@ def main():
         f.write("# ==========================================\n")
         f.write(f'SAAS_PROJECT_ID="{saas_id}"\n')
         f.write(f'REGION="{region}"\n\n')
+        f.write(f'API_JAR_BUCKET="{api_jar_bucket}"\n\n')
 
         f.write("# ==========================================\n")
         f.write("# マルチテナント設定 (JSON 形式)\n")
@@ -127,8 +129,9 @@ def main():
         f.write("# ==========================================\n")
         f.write("# 共通設定 (SaaS 基盤側)\n")
         f.write("# ==========================================\n")
-        f.write(f'saas_project_id = "{saas_id}"\n')
-        f.write(f'region          = "{region}"\n\n')
+        f.write(f'saas_project_id     = "{saas_id}"\n')
+        f.write(f'region              = "{region}"\n\n')
+        f.write(f'api_jar_bucket_name = "{api_jar_bucket}"\n\n')
 
         f.write("# ==========================================\n")
         f.write("# マルチテナント設定 (マップ 形式)\n")

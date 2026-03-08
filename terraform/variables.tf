@@ -7,6 +7,10 @@ variable "region" {
   default = "us-central1"
 }
 
+variable "api_jar_bucket" {
+  type  = string
+}
+
 variable "service_account_id" {
   default = "gemini-bq-query-analyzer-sa"
 }
