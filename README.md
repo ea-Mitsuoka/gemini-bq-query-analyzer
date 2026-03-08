@@ -112,20 +112,26 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 ## ☁️ 環境構築: 共通
 
+### 1. Project IDを環境ファイルに設定
+
+```bash
+# 環境変数設定
+sed -i '' "s/<saas_project_id>/$(gcloud config get-value project)/g" base_config.ini
+```
+
 ### 1. GCSバケットを作成(初回のみ)
 
 \# tfstateファイル格納用
 
 ```bash
-# 環境変数設定
 export $(grep -v '^\[.*\]' base_config.ini | sed 's/ *= */=/g' | xargs)
 
 # 1. ランダムな4桁のサフィックスを生成
 RANDOM_SUFFIX=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
 
 # 2. 新しいバケット名を決定（例: ea-agentspacepj-tfstate-a1b2）
-NEW_TFSTATE_BUCKET="tfstate-for-gemini-bq-analyzer-${saas_project_id}-${RANDOM_SUFFIX}"
-echo "✨ 新しいtfstateバケット: ${NEW_TFSTATE_BUCKET}"
+NEW_TFSTATE_BUCKET="tfstate-gemini-bq-analyzer-${saas_project_id}-${RANDOM_SUFFIX}"
+echo "✨ 新しいtfstateバケット名: ${NEW_TFSTATE_BUCKET}"
 
 # 3. バケットを作成
 gcloud storage buckets create "gs://${NEW_TFSTATE_BUCKET}" \
@@ -140,8 +146,8 @@ gcloud storage buckets create "gs://${NEW_TFSTATE_BUCKET}" \
 RANDOM_SUFFIX=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
 
 # 2. 新しいバケット名を決定（例: ea-agentspacepj-tfstate-a1b2）
-NEW_API_JAR_BUCKET="api-jar-for-gemini-bq-analyzer-${saas_project_id}-${RANDOM_SUFFIX}"
-echo "✨ 新しいtfstateバケット: ${NEW_API_JAR_BUCKET}"
+NEW_API_JAR_BUCKET="api-jar-gemini-bq-analyzer-${saas_project_id}-${RANDOM_SUFFIX}"
+echo "✨ 新しいtfstateバケット名: ${NEW_API_JAR_BUCKET}"
 
 # 3. バケットを作成
 gcloud storage buckets create "gs://${NEW_API_JAR_BUCKET}" \
@@ -162,6 +168,10 @@ sed -i '' "s/<api_jar_bucket_name>/${NEW_API_JAR_BUCKET}/g" base_config.ini
 
 # 3. 置換結果の確認
 cat base_config.ini
+
+# 4. 更新をGithubにpush
+git add base_config.ini
+git push origin main
 ```
 
 ### 3. Terraform実行用のサービスアカウント作成
@@ -204,12 +214,12 @@ ROLES=(
     "roles/serviceusage.serviceUsageAdmin"
     "roles/iam.serviceAccountUser"
     "roles/iam.serviceAccountAdmin"
-    "roles/storage.Admin"
+    "roles/storage.admin"
     "roles/cloudscheduler.admin"
-    "roles/logging.logWriter"
     "roles/workflows.editor"
     "roles/viewer"
 )
+    # "roles/logging.logWriter"
 
 SA_EMAIL="terraform-deployer-sa@${saas_project_id}.iam.gserviceaccount.com"
 
