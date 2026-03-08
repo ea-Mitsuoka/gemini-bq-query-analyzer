@@ -328,7 +328,7 @@ region          = "us-central1"
 # ==========================================
 tenants = {
   "pacific-legend" = {
-    customer_project_id       = "pacific-legend-634"
+    customer_project_id       = "tenant-1"
     gcs_bucket_name           = "gemini-query-analyzer-reports"
     worst_query_limit         = "1"
     time_range_interval       = "2 DAY"
@@ -336,7 +336,7 @@ tenants = {
     scheduler_cron            = "0 9 * * *"
   }
   "datatechlab" = {
-    customer_project_id       = "ea-datatechlab"
+    customer_project_id       = "tenant-2"
     gcs_bucket_name           = "gemini-query-analyzer-reports"
     worst_query_limit         = "1"
     time_range_interval       = "2 DAY"
