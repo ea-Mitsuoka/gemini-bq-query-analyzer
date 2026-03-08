@@ -130,7 +130,7 @@ export $(grep -v '^\[.*\]' base_config.ini | sed 's/ *= */=/g' | xargs)
 # 1. ランダムな4桁のサフィックスを生成
 RANDOM_SUFFIX=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
 
-# 2. 新しいバケット名を決定（例: ea-agentspacepj-tfstate-a1b2）
+# 2. 新しいバケット名を決定
 NEW_TFSTATE_BUCKET="tfstate-gemini-bq-analyzer-${saas_project_id}-${RANDOM_SUFFIX}"
 echo "✨ 新しいtfstateバケット名: ${NEW_TFSTATE_BUCKET}"
 
@@ -146,7 +146,7 @@ gcloud storage buckets create "gs://${NEW_TFSTATE_BUCKET}" \
 # 1. ランダムな4桁のサフィックスを生成
 RANDOM_SUFFIX=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 4)
 
-# 2. 新しいバケット名を決定（例: ea-agentspacepj-tfstate-a1b2）
+# 2. 新しいバケット名を決定
 NEW_API_JAR_BUCKET="api-jar-gemini-bq-analyzer-${saas_project_id}-${RANDOM_SUFFIX}"
 echo "✨ 新しいtfstateバケット名: ${NEW_API_JAR_BUCKET}"
 
