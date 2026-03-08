@@ -37,6 +37,7 @@ jobs:
           path: |
             env.txt
             terraform/terraform.tfvars
+            terraform/backend.tf
           retention-days: 1
 
       # 3. Terraformセットアップ
