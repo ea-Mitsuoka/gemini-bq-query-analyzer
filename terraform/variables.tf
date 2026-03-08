@@ -7,7 +7,7 @@ variable "region" {
   default = "us-central1"
 }
 
-variable "api_jar_bucket" {
+variable "api_jar_bucket_name" {
   type  = string
 }
 
