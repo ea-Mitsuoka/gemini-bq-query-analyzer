@@ -243,7 +243,7 @@ echo "IAM policy binding completed."
 * slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
 * scheduler_cron
 
-### Github ActionsのSercretを登録
+### 6. Github ActionsのSercretを登録
 
 Setteings > Secrets and variables > Actions > New repositry secret
 
@@ -259,15 +259,13 @@ Cloud Run ServiceとしてデプロイしてAPI化するために下記を実施
 * [Github](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases)から`bigquery-antipattern-recognition.jar`をダウンロード
 * ローカルで実行することも考慮して`bq-antipattern-api/`に`bigquery-antipattern-recognition.jar`を配置
 
-## 2. BigQuery Antipattern RecognitionツールをGCSへ格納
+### 2. BigQuery Antipattern RecognitionツールをGCSへ格納
 
 ```bash
 gcloud storage cp bq-antipattern-api/bigquery-antipattern-recognition.jar gs://${NEW_API_JAR_BUCKET}/
 ```
 
 ### 3. Github Actionsの手動実行
-
-Github Actionsには、terraform実行用のサービスアカウントのJSONと顧客情報スプレッドシートのIDを保存しておく
 
 * GitHub リポジトリの Actions タブに移動
 * 左側のメニューから Manual Deploy from Spreadsheet（または設定したワークフロー名）を選択
