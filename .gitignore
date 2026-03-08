@@ -6,6 +6,7 @@
 *.tfstate.*
 *.tfvars
 *.tfbackend
+backend.tf
 
 # Environment files
 .env

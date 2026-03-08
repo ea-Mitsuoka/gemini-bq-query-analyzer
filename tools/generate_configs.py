@@ -10,6 +10,7 @@ BASE_CONFIG_INI = os.path.join(BASE_DIR, "base_config.ini")
 ENV_PATH = os.path.join(BASE_DIR, "env.txt")
 TFVARS_DIR = os.path.join(BASE_DIR, "terraform")
 TFVARS_PATH = os.path.join(TFVARS_DIR, "terraform.tfvars")
+BACKEND_TF_PATH = os.path.join(TFVARS_DIR, "backend.tf")
 
 # --- スプレッドシート設定（定数） ---
 SHEET_NAME = "Sheet1"  # 実際のシート名に合わせて変更してください
@@ -52,6 +53,7 @@ def main():
     try:
         saas_id = config['gcp']['saas_project_id']
         region = config['gcp']['region']
+        tfstate_bucket = config['gcp']['tfstate_bucket_name'] # ←これを追加
     except KeyError as e:
         print(f"エラー: base_config.ini の設定項目が不足しています: {e}")
         return
@@ -88,7 +90,7 @@ def main():
 
     tenants = {}
     for row in rows:
-        # 判定された列数に満たない行は不完全データとしてスキップ 
+        # 判定された列数に満たない行は不完全データとしてスキップ
         if len(row) < col_count:
             continue
 
@@ -123,6 +125,16 @@ def main():
             for k, v in cfg.items():
                 f.write(f'    {k:<25} = "{v}"\n')
             f.write("  }\n")
+        f.write("}\n")
+
+    # 5. backend.tf の書き出し
+    with open(BACKEND_TF_PATH, "w", encoding='utf-8') as f:
+        f.write("# Generated from base_config.ini - DO NOT EDIT\n")
+        f.write("terraform {\n")
+        f.write('  backend "gcs" {\n')
+        f.write(f'    bucket = "{tfstate_bucket}"\n')
+        f.write('     prefix = "terraform/state"\n')
+        f.write('  }\n')
         f.write("}\n")
 
     print(f"完了: 処理テナント数: {len(tenants)}")
