@@ -625,10 +625,3 @@ for TENANT_KEY in $(echo "$TENANTS_JSON" | jq -r 'keys[]'); do
         --time-zone "Asia/Tokyo"
 done
 ```
-
----
-
-### 💡 メモ
-
-* `env.txt` ファイルの読み込み仕様について
-  * 当プロジェクトでは、インフラ（Terraform）、メインバッチ（`main-app/`）、API（`bq-antipattern-api/`）をひとつのリポジトリで管理するモノレポ構成を採用しており`env.txt`ファイルは両方から参照します。
