@@ -2,12 +2,16 @@
 resource "null_resource" "build_api_image" {
   # ソースコードやJARファイルが変更されたら再実行
   triggers = {
-    src_hash = sha256(file("${path.module}/../bq-antipattern-api/app.py"))
-    jar_hash = filesha256("${path.module}/../bq-antipattern-api/bigquery-antipattern-recognition.jar")
+    src_hash    = sha256(file("${path.module}/../bq-antipattern-api/app.py"))
+    docker_hash = sha256(file("${path.module}/../bq-antipattern-api/Dockerfile"))
   }
 
   provisioner "local-exec" {
     command = <<EOT
+      # 1. GCSからローカルのディレクトリにJARファイルをダウンロード
+      gcloud storage cp gs://${var.api_jar_bucket_name}/bigquery-antipattern-recognition.jar ../bq-antipattern-api/
+
+      # 2. ダウンロードしたJARを含めてCloud Buildでビルド
       gcloud builds submit ../bq-antipattern-api \
         --tag ${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/bq-antipattern-api:latest \
         --project ${var.saas_project_id}
@@ -40,7 +44,7 @@ resource "google_cloud_run_v2_service" "antipattern_api" {
         }
       }
     }
-    service_account = google_service_account.analyzer_sa.email
+    service_account = data.google_service_account.analyzer_sa.email
   }
   # ビルドが終わってからサービスを作成・更新する
   depends_on = [null_resource.build_api_image]

@@ -6,12 +6,14 @@
 *.tfstate.*
 *.tfvars
 *.tfbackend
+backend.tf
 
 # Environment files
 .env
 tools/token.json
 client_secrets.json
 .venv
+env.txt
 
 # Automatically created terraform files
 

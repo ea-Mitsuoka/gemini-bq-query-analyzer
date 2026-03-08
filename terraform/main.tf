@@ -1,9 +1,7 @@
 terraform {
   required_version = ">= 1.5.0"
-  backend "gcs" {
-    bucket = "gemini-bq-query-analyzer-tfstate" # 事前にGCSに作成したtfstate管理用バケット名を手動で記載してください
-    prefix = "terraform/state"
-  }
+  # backend設定は generate_configs.py によって backend.tf として自動生成されます
+
   required_providers {
     google = {
       source  = "hashicorp/google"

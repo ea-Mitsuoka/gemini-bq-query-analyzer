@@ -2,7 +2,7 @@ resource "google_workflows_workflow" "analyzer_workflow" {
   name            = "gemini-bq-query-analyzer-workflow"
   region          = var.region
   description     = "Orchestrates BQ Analysis Job and Slack Notification"
-  service_account = google_service_account.analyzer_sa.id
+  service_account = data.google_service_account.analyzer_sa.id
 
   # 外部のYAMLファイルを読み込む
   source_contents = templatefile("${path.module}/../workflows/analyzer_workflow.yaml", {

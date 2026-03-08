@@ -1,5 +1,6 @@
 locals {
   services = [
+    "sheets.googleapis.com",
     "aiplatform.googleapis.com",
     "run.googleapis.com",
     "cloudbuild.googleapis.com",

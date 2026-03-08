@@ -13,17 +13,17 @@ resource "google_cloud_scheduler_job" "tenant_schedulers" {
 
     body = base64encode(jsonencode({
       argument = jsonencode({
-        tenant_id         = each.key
-        customer_project_id = each.value.customer_project_id
-        gcs_bucket_name     = each.value.gcs_bucket_name
-        worst_query_limit   = each.value.worst_query_limit
-        time_range_interval = each.value.time_range_interval
-        slack_webhook_secret_name   = each.value.slack_webhook_secret_name
+        tenant_id                 = each.key
+        customer_project_id       = each.value.customer_project_id
+        gcs_bucket_name           = each.value.gcs_bucket_name
+        worst_query_limit         = each.value.worst_query_limit
+        time_range_interval       = each.value.time_range_interval
+        slack_webhook_secret_name = each.value.slack_webhook_secret_name
       })
     }))
 
     oauth_token {
-      service_account_email = google_service_account.analyzer_sa.email
+      service_account_email = data.google_service_account.analyzer_sa.email
     }
   }
 }
