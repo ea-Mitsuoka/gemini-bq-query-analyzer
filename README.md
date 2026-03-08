@@ -254,8 +254,6 @@ Setteings > Secrets and variables > Actions > New repositry secret
 
 ### 1. BigQuery Antipattern Recognitionツールをダウンロード
 
-Cloud Run ServiceとしてデプロイしてAPI化するために下記を実施
-
 * [Github](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases)から`bigquery-antipattern-recognition.jar`をダウンロード
 * ローカルで実行することも考慮して`bq-antipattern-api/`に`bigquery-antipattern-recognition.jar`を配置
 
