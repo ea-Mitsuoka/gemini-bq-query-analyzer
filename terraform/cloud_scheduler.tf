@@ -23,7 +23,7 @@ resource "google_cloud_scheduler_job" "tenant_schedulers" {
     }))
 
     oauth_token {
-      service_account_email = google_service_account.analyzer_sa.email
+      service_account_email = data.google_service_account.analyzer_sa.email
     }
   }
 }

@@ -44,7 +44,7 @@ resource "google_cloud_run_v2_service" "antipattern_api" {
         }
       }
     }
-    service_account = google_service_account.analyzer_sa.email
+    service_account = data.google_service_account.analyzer_sa.email
   }
   # ビルドが終わってからサービスを作成・更新する
   depends_on = [null_resource.build_api_image]

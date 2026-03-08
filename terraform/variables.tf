@@ -11,6 +11,7 @@ variable "api_jar_bucket_name" {
   type  = string
 }
 
+# 変更すると顧客プロジェクトに影響が出るため要注意.原則としてDefaultのままにすること.
 variable "service_account_id" {
   default = "gemini-bq-query-analyzer-sa"
 }

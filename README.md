@@ -178,6 +178,12 @@ git push origin deploy
 ### 3. Terraform実行用のサービスアカウント作成
 
 ```bash
+# ワークロード実行用
+gcloud iam service-accounts create gemini-bq-query-analyzer-sa \
+    --display-name="Gemini Query Analyzer Service Account" \
+    --project=${saas_project_id}
+
+# Terraform デプロイ用
 gcloud iam service-accounts create terraform-deployer-sa \
     --display-name="Terraform SaaS Infrastructure Manager" \
     --project=${saas_project_id}

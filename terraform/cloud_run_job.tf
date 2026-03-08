@@ -11,7 +11,7 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
 
   template {
     template {
-      service_account = google_service_account.analyzer_sa.email
+      service_account = data.google_service_account.analyzer_sa.email
       timeout         = "600s"
 
       containers {
