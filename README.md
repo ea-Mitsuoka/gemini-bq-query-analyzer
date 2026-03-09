@@ -206,7 +206,39 @@ gcloud iam service-accounts create terraform-deployer-sa \
     --project=${saas_project_id}
 ```
 
-### 8.Terraform実行用のサービスアカウントにIAMロール付与
+### 8. ワークロードサービスアカウントに顧客側の権限付与
+
+\# ワークロード用サービスアカウントに必要なIAMロール
+
+| 行番号 | 表示名 | ロール識別子 | 利用目的 |
+| :--- | :--- | :--- | :--- |
+| 1 | BigQuery メタデータ閲覧者 | roles/bigquery.metadataViewer | 改善対象のテーブルのスキーマ等を読み取り |
+| 2 | BigQuery リソース閲覧者 | roles/bigquery.resourceViewer | INFOMATION_SCHEMAからジョブ履歴の読み取り |
+| 3 | Storage オブジェクト管理者 | roles/storage.objectAdmin | 診断レポートをGCSバケットへ納品 |
+
+```bash
+CUSTOMER_GCS_BUCKET_NAME=""
+CUSTOMER_PROJECT_ID=""
+CUSTOMER_ROLES=(
+    "roles/bigquery.metadataViewer"
+    "roles/bigquery.resourceViewer"
+)
+SA_EMAIL="gemini-bq-query-analyzer-sa@${}"
+
+for ROLE in ${CUSTOMER_ROLES[@]}; do
+    gcloud projects add-iam-policy-binding $CUSTOMER_PROJECT_ID \
+        --member="serviceAccount:${SA_EMAIL}" \
+        --role="$ROLE" \
+        --condition=None
+done
+
+gcloud storage buckets add-iam-policy-binding "gs://${CUSTOMER_GCS_BUCKET_NAME}" \
+    --member="serviceAccount:${SA_EMAIL}" \
+    --role="roles/storage.objectAdmin" \
+    --quiet
+```
+
+### 9.Terraform実行用のサービスアカウントにIAMロール付与
 
 \# Terraform実行用サービスアカウントに必要なIAMロール
 
@@ -259,7 +291,7 @@ done
 echo "IAM policy binding completed."
 ```
 
-### 9. 顧客情報のスプレッドシート`Gemini-BQ-Query-Analyzer-Tenant-Master`を準備
+### 10. 顧客情報のスプレッドシート`Gemini-BQ-Query-Analyzer-Tenant-Master`を準備
 
 下記の項目を設定する
 
@@ -271,21 +303,21 @@ echo "IAM policy binding completed."
 * slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
 * scheduler_cron
 
-### 10. Github ActionsのSercretを登録
+### 11. Github ActionsのSercretを登録
 
 Setteings > Secrets and variables > Actions > New repositry secret
 
 * GOOGLE_CREDENTIALS: 作成したTerraform実行用サービスアカウントのJSONキー
 * SPREADSHEET_ID: 顧客情報スプレッドシートのID
 
-### 11. Github Actionsの手動実行
+### 12. Github Actionsの手動実行
 
 * GitHub リポジトリの Actions タブに移動
 * 左側のメニューから Manual Deploy from Spreadsheet（または設定したワークフロー名）を選択
 * `deploy`ブランチを選択し、Run workflow ボタンをクリックして実行
   * `terraform apply`まで実行される
 
-### 12. 生成ファイルの確認とダウンロード
+### 13. 生成ファイルの確認とダウンロード
 
 Manual Deploy from Spreadsheet > Summary > deployment-configs > ↓
 
