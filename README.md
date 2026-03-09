@@ -106,6 +106,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 
 * 置換変数の整合性: gemini_prompt.txt 内で使用する変数（{query} や {billed_gb} など）が、Python コード側で定義した辞書のキーと完全に一致している必要があります。
 * Spread Sheet APIを有効化`gcloud services enable sheets.googleapis.com --project=<saas_project_id>`
+* 予め顧客側のプロジェクトでIAMロール(`BigQuery メタデータ閲覧者`,`BigQuery リソース閲覧者`,`Storage オブジェクト管理者`)を付与してもらう必要があります。
 
 ---
 
