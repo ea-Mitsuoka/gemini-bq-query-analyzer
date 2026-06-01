@@ -4,18 +4,17 @@ BigQueryの `INFORMATION_SCHEMA` からワーストクエリを抽出し、Gemin
 
 ## 📖 目次
 
-- [🏗️ アーキテクチャ図](#️-アーキテクチャ図)
-- [📁 ディレクトリ構成](#-ディレクトリ構成)
-- [🛑 前提条件](#-前提条件)
-- [☁️ 環境構築](#️-環境構築)
-- [Terraformによる構築（推奨）](#terraformによる構築推奨)
-- [gcloudによる手動構築](#gcloudによる手動構築)
-- [💡 使い方](#-使い方)
-- [自動実行](#自動実行)
-- [手動実行](#手動実行)
-- [実行結果](#実行結果)
-- [🗑️ 環境破棄](#️-環境破棄)
-
+- [🏗️ アーキテクチャ図](#%EF%B8%8F-%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3%E5%9B%B3)
+- [📁 ディレクトリ構成](#-%E3%83%87%E3%82%A3%E3%83%AC%E3%82%AF%E3%83%88%E3%83%AA%E6%A7%8B%E6%88%90)
+- [🛑 前提条件](#-%E5%89%8D%E6%8F%90%E6%9D%A1%E4%BB%B6)
+- [☁️ 環境構築](#%EF%B8%8F-%E7%92%B0%E5%A2%83%E6%A7%8B%E7%AF%89)
+- [Terraformによる構築（推奨）](#terraform%E3%81%AB%E3%82%88%E3%82%8B%E6%A7%8B%E7%AF%89%E6%8E%A8%E5%A5%A8)
+- [gcloudによる手動構築](#gcloud%E3%81%AB%E3%82%88%E3%82%8B%E6%89%8B%E5%8B%95%E6%A7%8B%E7%AF%89)
+- [💡 使い方](#-%E4%BD%BF%E3%81%84%E6%96%B9)
+- [自動実行](#%E8%87%AA%E5%8B%95%E5%AE%9F%E8%A1%8C)
+- [手動実行](#%E6%89%8B%E5%8B%95%E5%AE%9F%E8%A1%8C)
+- [実行結果](#%E5%AE%9F%E8%A1%8C%E7%B5%90%E6%9E%9C)
+- [🗑️ 環境破棄](#%EF%B8%8F-%E7%92%B0%E5%A2%83%E7%A0%B4%E6%A3%84)
 
 ## 🏗️ アーキテクチャ図
 
@@ -119,23 +118,23 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
     └── Dockerfile                # Java + Python 同居のService用コンテナ定義
 ```
 
----
+______________________________________________________________________
 
 ## 🛑 前提条件
 
 本ツールをセットアップする前に、お使いの環境が以下の要件を満たしていることを確認してください。
 
-* **Google Cloud SDK**: `gcloud` コマンドがインストールされ、認証済みであること。
-* **Google Cloud プロジェクト**:
-    *   SaaS基盤をホストするためのGoogle Cloud プロジェクト（以下、SaaSプロジェクト）が準備されていること。
-    *   分析対象の顧客プロジェクト（以下、顧客プロジェクト）が準備されていること。
-* **顧客プロジェクトにおける権限**: ワークロード用サービスアカウント（`gemini-bq-query-analyzer-sa`）に対して、顧客プロジェクト側で以下のIAMロールが付与されていること。
-    *   `BigQuery メタデータ閲覧者`
-    *   `BigQuery リソース閲覧者`
-    *   `Storage オブジェクト管理者` （分析レポートを格納するGCSバケットに対して）
-* **プロンプトとコードの整合性**: `main-app/prompts/gemini_prompt.txt` 内の変数（例: `{query}`）が、`main-app/src/main.py` で定義される辞書のキーと一致していること。
+- **Google Cloud SDK**: `gcloud` コマンドがインストールされ、認証済みであること。
+- **Google Cloud プロジェクト**:
+  - SaaS基盤をホストするためのGoogle Cloud プロジェクト（以下、SaaSプロジェクト）が準備されていること。
+  - 分析対象の顧客プロジェクト（以下、顧客プロジェクト）が準備されていること。
+- **顧客プロジェクトにおける権限**: ワークロード用サービスアカウント（`gemini-bq-query-analyzer-sa`）に対して、顧客プロジェクト側で以下のIAMロールが付与されていること。
+  - `BigQuery メタデータ閲覧者`
+  - `BigQuery リソース閲覧者`
+  - `Storage オブジェクト管理者` （分析レポートを格納するGCSバケットに対して）
+- **プロンプトとコードの整合性**: `main-app/prompts/gemini_prompt.txt` 内の変数（例: `{query}`）が、`main-app/src/main.py` で定義される辞書のキーと一致していること。
 
----
+______________________________________________________________________
 
 ## ☁️ 環境構築
 
@@ -213,8 +212,8 @@ git push origin deploy
 
 #### 5. BigQuery Antipattern Recognitionツールをダウンロード
 
-* [Github](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases)から`bigquery-antipattern-recognition.jar`をダウンロード
-* ローカルで実行することも考慮して`bq-antipattern-api/`に`bigquery-antipattern-recognition.jar`を配置
+- [Github](https://github.com/GoogleCloudPlatform/bigquery-antipattern-recognition/releases)から`bigquery-antipattern-recognition.jar`をダウンロード
+- ローカルで実行することも考慮して`bq-antipattern-api/`に`bigquery-antipattern-recognition.jar`を配置
 
 #### 6. BigQuery Antipattern RecognitionツールをGCSへ格納
 
@@ -325,27 +324,27 @@ echo "IAM policy binding completed."
 
 下記の項目を設定する
 
-* tenant_id
-* customer_project_id
-* gcs_bucket_name([注意⚠️]予め顧客に作成してもらい、バケット名を聞く)
-* worst_query_limit
-* time_range_interval
-* slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
-* scheduler_cron
+- tenant_id
+- customer_project_id
+- gcs_bucket_name([注意⚠️]予め顧客に作成してもらい、バケット名を聞く)
+- worst_query_limit
+- time_range_interval
+- slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
+- scheduler_cron
 
 #### 11. Github ActionsのSercretを登録
 
 Setteings > Secrets and variables > Actions > New repositry secret
 
-* GOOGLE_CREDENTIALS: 作成したTerraform実行用サービスアカウントのJSONキー
-* SPREADSHEET_ID: 顧客情報スプレッドシートのID
+- GOOGLE_CREDENTIALS: 作成したTerraform実行用サービスアカウントのJSONキー
+- SPREADSHEET_ID: 顧客情報スプレッドシートのID
 
 #### 12. Github Actionsの手動実行
 
-* GitHub リポジトリの Actions タブに移動
-* 左側のメニューから Manual Deploy from Spreadsheet（または設定したワークフロー名）を選択
-* `deploy`ブランチを選択し、Run workflow ボタンをクリックして実行
-  * `terraform apply`まで実行される
+- GitHub リポジトリの Actions タブに移動
+- 左側のメニューから Manual Deploy from Spreadsheet（または設定したワークフロー名）を選択
+- `deploy`ブランチを選択し、Run workflow ボタンをクリックして実行
+  - `terraform apply`まで実行される
 
 #### 13. 生成ファイルの確認とダウンロード
 
@@ -431,7 +430,8 @@ terraform {
 }
 ```
 
----
+______________________________________________________________________
+
 ### gcloudによる手動構築
 
 #### 1. SaaSプロジェクトのAPIの有効化
@@ -663,24 +663,29 @@ done
 ## 💡 使い方
 
 ### 自動実行
+
 環境構築が完了すると、ツールはCloud Schedulerによってテナントごとに定義されたスケジュール（`scheduler_cron`）で自動的に実行されます。
 
 ### 手動実行
+
 特定のテナントに対して即時分析を実行したい場合は、以下の手順でCloud Workflowsを直接実行します。
 
-1.  **gcloudで認証します。**
-    ```bash
-    gcloud auth login
-    gcloud config set project <SaaSプロジェクトID>
-    ```
+1. **gcloudで認証します。**
 
-2.  **Workflowsを実行します。**
-    `<TENANT_ID>` を、スプレッドシートで定義した対象のテナントIDに置き換えてください。
-    ```bash
-    gcloud workflows run gemini-bq-query-analyzer-workflow --data='{"argument": "{\"tenant_id\": \"<TENANT_ID>\"}"}'
-    ```
+   ```bash
+   gcloud auth login
+   gcloud config set project <SaaSプロジェクトID>
+   ```
+
+1. **Workflowsを実行します。**
+   `<TENANT_ID>` を、スプレッドシートで定義した対象のテナントIDに置き換えてください。
+
+   ```bash
+   gcloud workflows run gemini-bq-query-analyzer-workflow --data='{"argument": "{\"tenant_id\": \"<TENANT_ID>\"}"}'
+   ```
 
 ### 実行結果
+
 処理が完了すると、指定したSlackチャンネルに以下のような通知が届きます。詳細な分析レポートは、通知に記載されたGCSリンクから確認できます。
 
 > :sparkles: **BigQuery クエリ最適化レポート**
@@ -688,6 +693,7 @@ done
 > プロジェクト `your-project-id` のためのBigQueryクエリ分析が完了しました。
 >
 > :bar_chart: **分析概要**
+>
 > - **分析対象期間:** 2024-01-01 00:00:00 UTC から 2024-01-02 00:00:00 UTC
 > - **分析対象クエリ数:** 5
 > - **レポートファイル:** [gs://your-bucket/report-20240102.md](https://console.cloud.google.com/storage/browser/your-bucket/report-20240102.md)
@@ -699,8 +705,8 @@ done
 
 ### 1. `backend.tf`と`terraform.tfvars`の配置
 
-* 一旦、Github ActionsでRun workflowを実行して生成した環境ファイルをダウンロード
-* `terraform/terrform.tfvars`に配置
+- 一旦、Github ActionsでRun workflowを実行して生成した環境ファイルをダウンロード
+- `terraform/terrform.tfvars`に配置
 
 ```bash
 cd Downloads/deployment-configs
