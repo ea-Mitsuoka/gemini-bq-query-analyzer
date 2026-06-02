@@ -1,4 +1,4 @@
-name: "Manual Deploy from Spreadsheet"
+name: "Manual Deploy"
 
 on:
   workflow_dispatch:
@@ -29,10 +29,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # 1. スプレッドシートからの設定生成
-      - name: Generate Configs from Spreadsheet
-        env:
-          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+      # 1. GCSからテナント設定を取得して各種設定ファイルを生成
+      - name: Generate Configs from GCS
         run: python tools/generate_configs.py
 
       # 2. 生成された設定ファイルの保存

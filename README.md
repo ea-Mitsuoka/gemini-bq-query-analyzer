@@ -87,11 +87,16 @@ flowchart LR
 gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 ├── base_config.ini               # Terraform初回セットアップ用の設定ファイル
 ├── env.txt                       # ローカル環境変数（Git除外）
+├── tenants.json                  # テナント設定（Git除外）
 ├── .gitignore
 │
 ├── .github/
-│   ├── workflows/
-│      └── deploy.yaml            # CI/CD
+│   └── workflows/
+│      └── deploy.yml             # CI/CD
+│
+├── tools/                        # 管理用スクリプト
+│   ├── generate_configs.py       # GCSからテナント設定を読み込み設定ファイルを生成（CI/CD用）
+│   └── upload_tenants.py         # スプレッドシートをtenants.jsonに変換してGCSへアップロード
 │
 ├── terraform/                    # インフラ定義
 │   ├── main.tf
@@ -365,17 +370,39 @@ gcloud iam service-accounts add-iam-policy-binding \
     --member="principalSet://iam.googleapis.com/${WIF_POOL}/attribute.repository/${GITHUB_REPO}"
 ```
 
-#### 11. 顧客情報のスプレッドシート`Gemini-BQ-Query-Analyzer-Tenant-Master`を準備
+#### 11. テナント設定ファイルをGCSにアップロード
 
-下記の項目を設定する
+下記の形式で `tenants.json` を作成し、tfstateバケットの `config/` 配下にアップロードする。
 
-- tenant_id
-- customer_project_id
-- gcs_bucket_name([注意⚠️]予め顧客に作成してもらい、バケット名を聞く)
-- worst_query_limit
-- time_range_interval
-- slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
-- scheduler_cron
+```json
+{
+  "<tenant_id>": {
+    "customer_project_id": "<顧客のGCPプロジェクトID>",
+    "gcs_bucket_name": "<レポート格納バケット名>",
+    "worst_query_limit": "1",
+    "time_range_interval": "1 DAY",
+    "slack_webhook_secret_name": "<Secret ManagerのSecret名>",
+    "scheduler_cron": "0 9 * * *"
+  }
+}
+```
+
+既存のスプレッドシートからCSV/Excelをダウンロードして変換する場合は `upload_tenants.py` を使う。
+
+```bash
+# CSV または Excel から変換してGCSへアップロード（openpyxlはExcelのみ必要）
+pip install google-cloud-storage openpyxl
+python tools/upload_tenants.py ~/Downloads/tenants.csv
+```
+
+手動でJSONを作成する場合はGCSへ直接アップロードする。
+
+```bash
+gcloud storage cp tenants.json gs://${NEW_TFSTATE_BUCKET}/config/tenants.json
+```
+
+> [!NOTE]
+> `gcs_bucket_name` は予め顧客に作成してもらいバケット名を確認すること。
 
 #### 12. Github ActionsのSercretを登録
 
@@ -385,13 +412,12 @@ Setteings > Secrets and variables > Actions > New repositry secret
   - 例: `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider`
 - SERVICE_ACCOUNT: Terraform実行用サービスアカウントのメールアドレス
   - 例: `terraform-deployer-sa@${saas_project_id}.iam.gserviceaccount.com`
-- SPREADSHEET_ID: 顧客情報スプレッドシートのID
 
 #### 13. Github Actionsの手動実行
 
 - GitHub リポジトリの Actions タブに移動
-- 左側のメニューから Manual Deploy from Spreadsheet（または設定したワークフロー名）を選択
-- `deploy`ブランチを選択し、Run workflow ボタンをクリックして実行
+- 左側のメニューから **Manual Deploy** を選択
+- `main`ブランチを選択し、Run workflow ボタンをクリックして実行
   - `terraform apply`まで実行される
 
 #### 14. 生成ファイルの確認とダウンロード
@@ -486,13 +512,14 @@ ______________________________________________________________________
 
 ```bash
 gcloud services enable \
-    sheets.googleapis.com \
     aiplatform.googleapis.com \
     run.googleapis.com \
     cloudbuild.googleapis.com \
     bigquery.googleapis.com \
     cloudscheduler.googleapis.com \
     iam.googleapis.com \
+    iamcredentials.googleapis.com \
+    sts.googleapis.com \
     storage.googleapis.com \
     workflows.googleapis.com \
     artifactregistry.googleapis.com \
@@ -726,7 +753,7 @@ done
    ```
 
 1. **Workflowsを実行します。**
-   `<TENANT_ID>` を、スプレッドシートで定義した対象のテナントIDに置き換えてください。
+   `<TENANT_ID>` を、`tenants.json` で定義した対象のテナントIDに置き換えてください。
 
    ```bash
    gcloud workflows run gemini-bq-query-analyzer-workflow --data='{"argument": "{\"tenant_id\": \"<TENANT_ID>\"}"}'
