@@ -325,6 +325,8 @@ echo "IAM policy binding completed."
 GitHub ActionsからサービスアカウントキーなしでGCPへ認証するために、Workload Identity FederationのPoolとProviderを作成します。
 
 ```bash
+GITHUB_REPO=""
+
 # Workload Identity Pool作成
 gcloud iam workload-identity-pools create "github-actions-pool" \
     --project="${saas_project_id}" \
@@ -338,6 +340,7 @@ gcloud iam workload-identity-pools providers create-oidc "github-provider" \
     --workload-identity-pool="github-actions-pool" \
     --display-name="GitHub Provider" \
     --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.actor=assertion.actor" \
+    --attribute-condition="assertion.repository == '${GITHUB_REPO}'" \
     --issuer-uri="https://token.actions.githubusercontent.com"
 
 # PoolのリソースIDを取得
@@ -355,8 +358,6 @@ WIF_PROVIDER=$(gcloud iam workload-identity-pools providers describe "github-pro
 echo "WIF_PROVIDER: ${WIF_PROVIDER}"
 
 # このリポジトリのGitHub Actionsにのみトークン交換を許可
-GITHUB_REPO="e-agency/gemini-bq-query-analyzer"
-
 gcloud iam service-accounts add-iam-policy-binding \
     "terraform-deployer-sa@${saas_project_id}.iam.gserviceaccount.com" \
     --project="${saas_project_id}" \
