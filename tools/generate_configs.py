@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import configparser
 import google.auth
@@ -57,14 +58,14 @@ def main():
         api_jar_bucket = config['gcp']['api_jar_bucket_name'] # ←これを追加
     except KeyError as e:
         print(f"エラー: base_config.ini の設定項目が不足しています: {e}")
-        return
+        sys.exit(1)
 
     # 2. 環境変数からスプレッドシートIDを取得
     spreadsheet_id = os.getenv("SPREADSHEET_ID")
 
     if not spreadsheet_id:
         print("エラー: 環境変数 SPREADSHEET_ID が未設定です。")
-        return
+        sys.exit(1)
 
     # スプレッドシートAPIの認証（ADCを使用）
     creds, _ = google.auth.default(
@@ -84,7 +85,7 @@ def main():
         rows = result.get("values", [])
     except Exception as e:
         print(f"エラー: スプレッドシートの取得に失敗しました: {e}")
-        return
+        sys.exit(1)
 
     tenants = {}
     for row in rows:
