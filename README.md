@@ -370,7 +370,36 @@ gcloud iam service-accounts add-iam-policy-binding \
     --member="principalSet://iam.googleapis.com/${WIF_POOL}/attribute.repository/${GITHUB_REPO}"
 ```
 
-#### 11. テナント設定ファイルをGCSにアップロード
+#### 11. Slack Webhook URLをSecret Managerに登録
+
+Slack通知を使用するテナントごとに、Webhook URLをSecret Managerへ登録する。
+
+**Slack側の手順：**
+
+1. [Slack API](https://api.slack.com/apps) でアプリを作成（または既存アプリを選択）
+1. **Incoming Webhooks** を有効化
+1. 通知先チャンネルを選択し、Webhook URL（`https://hooks.slack.com/services/...`）を取得
+
+**Secret Managerへの登録：**
+
+```bash
+WEBHOOK_URL="https://hooks.slack.com/services/<T_ID>/<B_ID>/<WEBHOOK_TOKEN>"
+SECRET_NAME="slack-webhook-<tenant_id>"
+
+gcloud secrets create ${SECRET_NAME} \
+    --project=${saas_project_id} \
+    --replication-policy="automatic"
+
+echo -n "${WEBHOOK_URL}" | gcloud secrets versions add ${SECRET_NAME} \
+    --project=${saas_project_id} \
+    --data-file=-
+```
+
+> [!NOTE]
+> `tenants.json` の `slack_webhook_secret_name` に、ここで登録した `SECRET_NAME` を設定する。
+> Slack通知が不要なテナントは `slack_webhook_secret_name` を空文字にすることで無効化できる。
+
+#### 12. テナント設定ファイルをGCSにアップロード
 
 下記の形式で `tenants.json` を作成し、tfstateバケットの `config/` 配下にアップロードする。
 
@@ -404,7 +433,7 @@ gcloud storage cp tenants.json gs://${NEW_TFSTATE_BUCKET}/config/tenants.json
 > [!NOTE]
 > `gcs_bucket_name` は予め顧客に作成してもらいバケット名を確認すること。
 
-#### 12. Github ActionsのSercretを登録
+#### 13. Github ActionsのSercretを登録
 
 Setteings > Secrets and variables > Actions > New repositry secret
 
@@ -413,14 +442,14 @@ Setteings > Secrets and variables > Actions > New repositry secret
 - SERVICE_ACCOUNT: Terraform実行用サービスアカウントのメールアドレス
   - 例: `terraform-deployer-sa@${saas_project_id}.iam.gserviceaccount.com`
 
-#### 13. Github Actionsの手動実行
+#### 14. Github Actionsの手動実行
 
 - GitHub リポジトリの Actions タブに移動
 - 左側のメニューから **Manual Deploy** を選択
 - `main`ブランチを選択し、Run workflow ボタンをクリックして実行
   - `terraform apply`まで実行される
 
-#### 14. 生成ファイルの確認とダウンロード
+#### 15. 生成ファイルの確認とダウンロード
 
 Manual Deploy from Spreadsheet > Summary > deployment-configs > ↓
 
