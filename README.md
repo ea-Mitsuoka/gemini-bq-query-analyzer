@@ -320,7 +320,51 @@ done
 echo "IAM policy binding completed."
 ```
 
-#### 10. 顧客情報のスプレッドシート`Gemini-BQ-Query-Analyzer-Tenant-Master`を準備
+#### 10. Workload Identity Poolの設定
+
+GitHub ActionsからサービスアカウントキーなしでGCPへ認証するために、Workload Identity FederationのPoolとProviderを作成します。
+
+```bash
+# Workload Identity Pool作成
+gcloud iam workload-identity-pools create "github-actions-pool" \
+    --project="${saas_project_id}" \
+    --location="global" \
+    --display-name="GitHub Actions Pool"
+
+# Workload Identity Provider作成（GitHubのOIDC設定）
+gcloud iam workload-identity-pools providers create-oidc "github-provider" \
+    --project="${saas_project_id}" \
+    --location="global" \
+    --workload-identity-pool="github-actions-pool" \
+    --display-name="GitHub Provider" \
+    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.actor=assertion.actor" \
+    --issuer-uri="https://token.actions.githubusercontent.com"
+
+# PoolのリソースIDを取得
+WIF_POOL=$(gcloud iam workload-identity-pools describe "github-actions-pool" \
+    --project="${saas_project_id}" \
+    --location="global" \
+    --format="value(name)")
+
+# ProviderのリソースIDを取得（GitHub Actions Secretに登録する値）
+WIF_PROVIDER=$(gcloud iam workload-identity-pools providers describe "github-provider" \
+    --project="${saas_project_id}" \
+    --location="global" \
+    --workload-identity-pool="github-actions-pool" \
+    --format="value(name)")
+echo "WIF_PROVIDER: ${WIF_PROVIDER}"
+
+# このリポジトリのGitHub Actionsにのみトークン交換を許可
+GITHUB_REPO="e-agency/gemini-bq-query-analyzer"
+
+gcloud iam service-accounts add-iam-policy-binding \
+    "terraform-deployer-sa@${saas_project_id}.iam.gserviceaccount.com" \
+    --project="${saas_project_id}" \
+    --role="roles/iam.workloadIdentityUser" \
+    --member="principalSet://iam.googleapis.com/${WIF_POOL}/attribute.repository/${GITHUB_REPO}"
+```
+
+#### 11. 顧客情報のスプレッドシート`Gemini-BQ-Query-Analyzer-Tenant-Master`を準備
 
 下記の項目を設定する
 
@@ -332,21 +376,24 @@ echo "IAM policy binding completed."
 - slack_webhook_secret_name(Secret Managerに登録したSlack Webhook URL)
 - scheduler_cron
 
-#### 11. Github ActionsのSercretを登録
+#### 12. Github ActionsのSercretを登録
 
 Setteings > Secrets and variables > Actions > New repositry secret
 
-- GOOGLE_CREDENTIALS: 作成したTerraform実行用サービスアカウントのJSONキー
+- WIF_PROVIDER: Workload Identity ProviderのリソースID（手順10で出力した `WIF_PROVIDER` の値）
+  - 例: `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider`
+- SERVICE_ACCOUNT: Terraform実行用サービスアカウントのメールアドレス
+  - 例: `terraform-deployer-sa@${saas_project_id}.iam.gserviceaccount.com`
 - SPREADSHEET_ID: 顧客情報スプレッドシートのID
 
-#### 12. Github Actionsの手動実行
+#### 13. Github Actionsの手動実行
 
 - GitHub リポジトリの Actions タブに移動
 - 左側のメニューから Manual Deploy from Spreadsheet（または設定したワークフロー名）を選択
 - `deploy`ブランチを選択し、Run workflow ボタンをクリックして実行
   - `terraform apply`まで実行される
 
-#### 13. 生成ファイルの確認とダウンロード
+#### 14. 生成ファイルの確認とダウンロード
 
 Manual Deploy from Spreadsheet > Summary > deployment-configs > ↓
 

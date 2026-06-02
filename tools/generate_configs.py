@@ -1,8 +1,8 @@
 import os
 import json
 import configparser
+import google.auth
 from googleapiclient.discovery import build
-from google.oauth2 import service_account
 
 # --- 設定パスの定義 ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,18 +59,15 @@ def main():
         print(f"エラー: base_config.ini の設定項目が不足しています: {e}")
         return
 
-    # 2. 環境変数から認証情報とスプレッドシートIDを取得
-    creds_json = os.getenv("GOOGLE_CREDENTIALS")
+    # 2. 環境変数からスプレッドシートIDを取得
     spreadsheet_id = os.getenv("SPREADSHEET_ID")
 
-    if not creds_json or not spreadsheet_id:
-        print("エラー: 環境変数 (GOOGLE_CREDENTIALS または SPREADSHEET_ID) が未設定です。")
+    if not spreadsheet_id:
+        print("エラー: 環境変数 SPREADSHEET_ID が未設定です。")
         return
 
-    # スプレッドシートAPIの認証
-    creds_info = json.loads(creds_json)
-    creds = service_account.Credentials.from_service_account_info(
-        creds_info,
+    # スプレッドシートAPIの認証（ADCを使用）
+    creds, _ = google.auth.default(
         scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
     )
     service = build("sheets", "v4", credentials=creds)
