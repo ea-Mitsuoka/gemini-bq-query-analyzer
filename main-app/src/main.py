@@ -356,7 +356,7 @@ def main():
         return
 
     vertexai.init(project=SAAS_PROJECT_ID, location=LOCATION)
-    model = GenerativeModel("gemini-2.5-flash")
+    model = GenerativeModel("gemini-3.5-flash")
 
     # 外部SQLファイルのロード
     try:
