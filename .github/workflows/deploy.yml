@@ -26,16 +26,19 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: uv sync --no-dev
 
       # 1. backend(tfstate)バケットを冪等に用意し、deployer SA に権限付与
       - name: Ensure state bucket
-        run: python tools/ensure_state_bucket.py
+        run: uv run python tools/ensure_state_bucket.py
 
       # 2. GCSからテナント設定を取得して各種設定ファイルを生成
       - name: Generate Configs from GCS
-        run: python tools/generate_configs.py
+        run: uv run python tools/generate_configs.py
 
       # 3. 生成された設定ファイルの保存
       - name: Upload Config Files as Artifact

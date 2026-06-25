@@ -33,9 +33,8 @@ help:  ## このヘルプを表示
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
 
-install:  ## uv でローカル環境を構築（.venv + 依存 + .terraform-version の terraform）
-	uv venv $(VENV)
-	uv pip install --python $(VENV)/bin/python -r requirements.txt -r requirements-dev.txt
+install:  ## uv でローカル環境を構築（uv.lock に固定された依存を同期 + terraform）
+	uv sync
 	@command -v tfenv >/dev/null 2>&1 && tfenv install \
 		|| echo "tfenv 未検出: .terraform-version (1.15.7) の terraform を別途用意してください"
 

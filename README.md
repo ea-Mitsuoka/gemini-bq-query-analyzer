@@ -431,9 +431,8 @@ python tools/generate_template.py
 #    列: tenant_id, customer_project_id, gcs_bucket_name, worst_query_limit,
 #        time_range_interval, slack_webhook_secret_name, scheduler_cron
 
-# 3. CSV または Excel から変換してGCSへアップロード（openpyxlはExcelのみ必要）
-pip install google-cloud-storage openpyxl
-python tools/upload_tenants.py tenants_template.csv
+# 3. CSV または Excel から変換してGCSへアップロード（依存は make install で導入済み）
+uv run python tools/upload_tenants.py tenants_template.csv
 ```
 
 > [!NOTE]

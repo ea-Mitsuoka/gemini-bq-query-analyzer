@@ -1,0 +1,22 @@
+[project]
+name = "gemini-bq-query-analyzer-tools"
+version = "0.1.0"
+description = "Gemini BQ Query Analyzer の管理ツール（CI/ローカル運用用）"
+requires-python = ">=3.11"
+dependencies = [
+    "google-cloud-storage",
+    "pyyaml",
+    "openpyxl",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+    "mdformat",
+    "mdformat-gfm",
+]
+
+# このリポジトリ自体はパッケージとしてビルド・インストールしない（依存管理のみ）
+[tool.uv]
+package = false
