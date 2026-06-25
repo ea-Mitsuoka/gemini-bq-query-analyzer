@@ -86,6 +86,7 @@ flowchart LR
 ```plaintext
 gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 ├── base_config.ini               # Terraform初回セットアップ用の設定ファイル
+├── Makefile                      # make init/plan/apply 等の運用タスク
 ├── env.txt                       # ローカル環境変数（Git除外）
 ├── tenants.json                  # テナント設定（Git除外）
 ├── .gitignore
@@ -95,6 +96,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 │      └── deploy.yml             # CI/CD
 │
 ├── tools/                        # 管理用スクリプト
+│   ├── ensure_state_bucket.py    # backend(tfstate)バケットを冪等に作成・堅牢化・権限付与
 │   ├── generate_template.py      # 空のテナント設定スプレッドシート(CSV/Excel)を生成
 │   ├── generate_configs.py       # GCSからテナント設定を読み込み設定ファイルを生成（CI/CD用）
 │   └── upload_tenants.py         # スプレッドシートをtenants.jsonに変換してGCSへアップロード
