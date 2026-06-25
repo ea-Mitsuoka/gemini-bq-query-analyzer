@@ -24,7 +24,7 @@ PY_SRC  := tools main-app/src bq-antipattern-api/app.py tests
 .DEFAULT_GOAL := help
 
 .PHONY: help install setup check template generate ensure-bucket ensure-bucket-dry-run \
-        init lint test plan deploy unlock lock destroy clean
+        init format lint test plan deploy unlock lock destroy clean
 
 help:  ## このヘルプを表示
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -55,9 +55,15 @@ ensure-bucket-dry-run:  ## ensure-bucket の変更内容を確認のみ
 init: ensure-bucket generate  ## バケット準備 -> 設定生成 -> terraform init
 	cd $(TF_DIR) && $(TF) init
 
-lint:  ## Python(ruff) と Terraform(fmt) の lint
+format:  ## 自動整形（書き込み）: ローカル開発者用。Python/Terraform/Markdown を一括整形
+	$(PYTHON) -m ruff check --fix $(PY_SRC)
+	cd $(TF_DIR) && $(TF) fmt -recursive
+	$(PYTHON) -m mdformat .
+
+lint:  ## 検査のみ（非破壊）: CI 用。整形差分があれば失敗
 	$(PYTHON) -m ruff check $(PY_SRC)
 	cd $(TF_DIR) && $(TF) fmt -check -recursive
+	$(PYTHON) -m mdformat --check .
 
 test:  ## pytest 実行
 	$(PYTHON) -m pytest

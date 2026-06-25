@@ -1,0 +1,4 @@
+# ローカルとCIで同一の整形結果にするための設定
+wrap = "keep"        # 行を再折り返ししない（差分・MD013競合を最小化）
+number = false       # 順序リストは全て "1." に統一（markdownlint MD029 既定と非衝突）
+end_of_line = "lf"

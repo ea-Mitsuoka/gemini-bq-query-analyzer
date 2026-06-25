@@ -1,3 +1,5 @@
 # 開発・CI 用ツール（make install で導入）
 pytest
 ruff
+mdformat
+mdformat-gfm
