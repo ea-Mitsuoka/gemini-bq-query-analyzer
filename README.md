@@ -212,7 +212,7 @@ cat base_config.ini
 
 # 4. 更新をGithubにpush
 git add base_config.ini
-git push origin deploy
+git push origin main
 ```
 
 #### 5. BigQuery Antipattern Recognitionツールをダウンロード

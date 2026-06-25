@@ -41,4 +41,3 @@ tests/test.sql
 bq-antipattern-api/*.jar
 processed_workflow.yaml
 configs/
-base_config.ini
