@@ -15,6 +15,7 @@ backend 初期化より前（terraform init の直前）に毎回実行する想
 デプロイ用SAは base_config.ini の [gcp] deployer_service_account、
 または環境変数 DEPLOYER_SA で上書きできる（既定: terraform-deployer-sa@<saas>.iam.gserviceaccount.com）。
 """
+
 import configparser
 import os
 import sys
@@ -69,8 +70,10 @@ def ensure_bucket(client, saas_id, region, bucket_name, dry_run):
         return client.get_bucket(bucket_name)
 
     if dry_run:
-        print(f"[bucket] (dry-run) 作成する: gs://{bucket_name} "
-              f"(project={saas_id}, location={region}) + versioning/UBLA/PAP")
+        print(
+            f"[bucket] (dry-run) 作成する: gs://{bucket_name} "
+            f"(project={saas_id}, location={region}) + versioning/UBLA/PAP"
+        )
         return bucket
 
     try:
@@ -81,8 +84,10 @@ def ensure_bucket(client, saas_id, region, bucket_name, dry_run):
         return client.get_bucket(bucket_name)
 
     harden_bucket(bucket)
-    print(f"[bucket] 作成し堅牢化しました: gs://{bucket_name} "
-          f"(versioning=ON, UBLA=ON, PAP={PUBLIC_ACCESS_PREVENTION})")
+    print(
+        f"[bucket] 作成し堅牢化しました: gs://{bucket_name} "
+        f"(versioning=ON, UBLA=ON, PAP={PUBLIC_ACCESS_PREVENTION})"
+    )
     return bucket
 
 
@@ -101,8 +106,7 @@ def ensure_iam(bucket, deployer_sa, dry_run):
         target_binding = None
 
     if dry_run:
-        print(f"[iam] (dry-run) 付与する: {member} -> {STATE_BUCKET_ROLE} "
-              f"on gs://{bucket.name}")
+        print(f"[iam] (dry-run) 付与する: {member} -> {STATE_BUCKET_ROLE} on gs://{bucket.name}")
         return
 
     if target_binding is None:

@@ -57,11 +57,13 @@ init: ensure-bucket generate  ## バケット準備 -> 設定生成 -> terraform
 
 format:  ## 自動整形（書き込み）: ローカル開発者用。Python/Terraform/Markdown を一括整形
 	-$(PYTHON) -m ruff check --fix $(PY_SRC)
+	$(PYTHON) -m ruff format $(PY_SRC)
 	cd $(TF_DIR) && $(TF) fmt -recursive
 	$(PYTHON) -m mdformat .
 
 lint:  ## 検査のみ（非破壊）: CI 用。整形差分があれば失敗
 	$(PYTHON) -m ruff check $(PY_SRC)
+	$(PYTHON) -m ruff format --check $(PY_SRC)
 	cd $(TF_DIR) && $(TF) fmt -check -recursive
 	$(PYTHON) -m mdformat --check .
 

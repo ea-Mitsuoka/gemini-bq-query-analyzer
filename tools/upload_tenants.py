@@ -11,6 +11,7 @@
     worst_query_limit, time_range_interval,
     slack_webhook_secret_name, scheduler_cron
 """
+
 import configparser
 import csv
 import json
@@ -59,10 +60,12 @@ def read_xlsx(filepath):
     for row in rows[1:]:
         if all(cell is None for cell in row):
             continue
-        result.append({
-            headers[i]: (str(row[i]).strip() if row[i] is not None else "")
-            for i in range(len(headers))
-        })
+        result.append(
+            {
+                headers[i]: (str(row[i]).strip() if row[i] is not None else "")
+                for i in range(len(headers))
+            }
+        )
     return result
 
 
@@ -86,12 +89,12 @@ def rows_to_tenants(rows):
         if not tenant_id:
             continue
         tenants[tenant_id] = {
-            "customer_project_id":       row.get("customer_project_id", "").strip(),
-            "gcs_bucket_name":           row.get("gcs_bucket_name", "").strip(),
-            "worst_query_limit":         row.get("worst_query_limit", "1").strip(),
-            "time_range_interval":       row.get("time_range_interval", "1 DAY").strip(),
+            "customer_project_id": row.get("customer_project_id", "").strip(),
+            "gcs_bucket_name": row.get("gcs_bucket_name", "").strip(),
+            "worst_query_limit": row.get("worst_query_limit", "1").strip(),
+            "time_range_interval": row.get("time_range_interval", "1 DAY").strip(),
             "slack_webhook_secret_name": row.get("slack_webhook_secret_name", "").strip(),
-            "scheduler_cron":            row.get("scheduler_cron", "0 9 * * *").strip(),
+            "scheduler_cron": row.get("scheduler_cron", "0 9 * * *").strip(),
         }
     return tenants
 

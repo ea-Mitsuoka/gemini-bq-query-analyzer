@@ -4,3 +4,5 @@ target-version = "py311"
 [lint]
 # pyflakes(F) / pycodestyle(E,W) / isort(I)
 select = ["E", "W", "F", "I"]
+# 行長(E501)は formatter(ruff format)が管理するため、linter では非強制にする
+ignore = ["E501"]

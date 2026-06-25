@@ -15,10 +15,7 @@ from google.cloud import bigquery, storage
 from vertexai.generative_models import GenerativeModel
 
 # --- ロギングの設定 ---
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -32,7 +29,7 @@ SAAS_PROJECT_ID = os.getenv("SAAS_PROJECT_ID")
 CUSTOMER_PROJECT_ID = os.getenv("CUSTOMER_PROJECT_ID")
 BQ_ANTIPATTERN_API_URL = os.getenv("BQ_ANTIPATTERN_API_URL")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
-LOCATION = "us-central1"        # Vertex AIのリージョン
+LOCATION = "us-central1"  # Vertex AIのリージョン
 # 調査期間の環境変数を取得
 TIME_RANGE_INTERVAL = os.getenv("TIME_RANGE_INTERVAL", "1 DAY")
 TIME_RANGE_START = os.getenv("TIME_RANGE_START")
@@ -42,12 +39,15 @@ WORST_QUERY_LIMIT = int(os.getenv("WORST_QUERY_LIMIT", "1"))
 # ファイルパスの設定
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORST_RANKING_SQL_PATH = os.path.join(BASE_DIR, "sql", "worst_ranking.sql")
-STORAGE_ANALYSIS_SQL_PATH = os.path.join(BASE_DIR, "sql", "logical_vs_physical_storage_analysis.sql")
+STORAGE_ANALYSIS_SQL_PATH = os.path.join(
+    BASE_DIR, "sql", "logical_vs_physical_storage_analysis.sql"
+)
 GEMINI_PROMPT_PATH = os.path.join(BASE_DIR, "prompts", "gemini_prompt.txt")
 
 # ==========================================
 # ヘルパー関数群
 # ==========================================
+
 
 def load_external_file(filepath):
     """外部SQLファイルを読み込む"""
@@ -55,6 +55,7 @@ def load_external_file(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
     with open(filepath, "r", encoding="utf-8") as f:
         return f.read()
+
 
 def check_bucket_exists(storage_client, bucket_name):
     """バケットの存在とアクセス権を確認"""
@@ -76,6 +77,7 @@ def check_bucket_exists(storage_client, bucket_name):
         logger.error(f"Unexpected Error while checking bucket '{bucket_name}': {e}")
         return False
 
+
 def get_current_user_email(client):
     """実行者のメールアドレスを取得（除外用）"""
     try:
@@ -85,6 +87,7 @@ def get_current_user_email(client):
     except Exception as e:
         logger.warning(f"Could not detect analyzer email: {e}")
         return "unknown"
+
 
 def get_active_regions(client, target_project):
     """データセットが存在するリージョンを特定"""
@@ -101,6 +104,7 @@ def get_active_regions(client, target_project):
         logger.error(f"Error discovering regions: {e}")
         return set()
 
+
 def get_time_range_expressions():
     """調査期間の条件式を組み立てる"""
     if TIME_RANGE_INTERVAL:
@@ -108,16 +112,20 @@ def get_time_range_expressions():
         end_time_expr = ""
     elif TIME_RANGE_START:
         start_time_expr = f"TIMESTAMP('{TIME_RANGE_START}')"
-        end_time_expr = f"AND creation_time <= TIMESTAMP('{TIME_RANGE_END}')" if TIME_RANGE_END else ""
+        end_time_expr = (
+            f"AND creation_time <= TIMESTAMP('{TIME_RANGE_END}')" if TIME_RANGE_END else ""
+        )
     else:
         # デフォルト設定 (1日前)
         start_time_expr = "TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)"
         end_time_expr = ""
     return start_time_expr, end_time_expr
 
+
 # ==========================================
 # 外部API / BigQuery 解析系関数
 # ==========================================
+
 
 @lru_cache(maxsize=1)
 def get_oidc_token(audience):
@@ -132,6 +140,7 @@ def get_oidc_token(audience):
         credentials.refresh(auth_req)
         return credentials.id_token
 
+
 def analyze_with_bq_antipattern_api(query_string):
     """構文解析APIを呼び出す。トークンはキャッシュを利用。"""
     if not BQ_ANTIPATTERN_API_URL:
@@ -145,7 +154,9 @@ def analyze_with_bq_antipattern_api(query_string):
         id_token = get_oidc_token(BQ_ANTIPATTERN_API_URL)
 
         headers = {"Authorization": f"Bearer {id_token}", "Content-Type": "application/json"}
-        response = requests.post(endpoint, json={"query": query_string}, headers=headers, timeout=60)
+        response = requests.post(
+            endpoint, json={"query": query_string}, headers=headers, timeout=60
+        )
         response.raise_for_status()
 
         return response.json().get("recommendations", "")
@@ -153,6 +164,7 @@ def analyze_with_bq_antipattern_api(query_string):
     except Exception as e:
         logger.error(f"bq-antipattern-api API call failed: {e}")
         return "アンチパターンの解析ツール呼び出しに失敗しました。"
+
 
 def get_query_schema_info(client, referenced_tables):
     """INFORMATION_SCHEMA.JOBSの履歴(referenced_tables)から元のテーブルの完全なスキーマ情報を取得する"""
@@ -184,7 +196,9 @@ def get_query_schema_info(client, referenced_tables):
                 # パーティション情報
                 if table.time_partitioning:
                     part_field = table.time_partitioning.field or "_PARTITIONTIME"
-                    info.append(f"  - パーティション列: {part_field} (分割タイプ: {table.time_partitioning.type_})")
+                    info.append(
+                        f"  - パーティション列: {part_field} (分割タイプ: {table.time_partitioning.type_})"
+                    )
                 else:
                     info.append("  - パーティション: 未設定 (フルスキャンのリスクあり)")
 
@@ -201,20 +215,22 @@ def get_query_schema_info(client, referenced_tables):
                 logger.warning(f"Failed to get schema for {table_id}: {e}")
                 schema_details.append(f"■ テーブル: {table_id} (権限不足等によりスキーマ取得失敗)")
 
-        return "\n\n".join(schema_details) if schema_details else "参照しているテーブル情報が取得できませんでした。"
+        return (
+            "\n\n".join(schema_details)
+            if schema_details
+            else "参照しているテーブル情報が取得できませんでした。"
+        )
 
     except Exception as e:
         logger.warning(f"Schema extraction failed: {e}")
         return "クエリの解析に失敗したため、スキーマ情報を特定できませんでした。"
 
+
 def analyze_storage_pricing(client, target_project, region, sql_template):
     """ストレージ料金モデルの判定"""
     try:
         # formatメソッドを使って外部SQLの変数を動的に置換
-        formatted_sql = sql_template.format(
-            target_project=target_project,
-            region=region
-        )
+        formatted_sql = sql_template.format(target_project=target_project, region=region)
         query_job = client.query(formatted_sql, location=region)
         results = list(query_job.result())
 
@@ -224,7 +240,7 @@ def analyze_storage_pricing(client, target_project, region, sql_template):
         # 表のヘッダーを作成（数値カラムは右寄せ --: を使用）
         lines = [
             "| データセット | 論理 (GB) | 物理 (GB) | 圧縮率 | 推奨アクション |",
-            "|---|--:|--:|--:|---|"
+            "|---|--:|--:|--:|---|",
         ]
         # 取得した結果を表の行として追加
         for row in results:
@@ -242,6 +258,7 @@ def analyze_storage_pricing(client, target_project, region, sql_template):
 # ==========================================
 # マスター辞書・プロンプト生成・通知系関数
 # ==========================================
+
 
 def load_master_dictionary(client, saas_project_id):
     """アンチパターンマスターの読み込み"""
@@ -265,6 +282,7 @@ def load_master_dictionary(client, saas_project_id):
         logger.error(f"Failed to load master dictionary: {e}")
         return {}
 
+
 def extract_relevant_dictionary(master_dict, detected_text):
     """検出されたアンチパターンのみ抽出"""
     if not detected_text or not master_dict:
@@ -272,6 +290,7 @@ def extract_relevant_dictionary(master_dict, detected_text):
 
     relevant_texts = [text for key, text in master_dict.items() if key in detected_text]
     return "\n\n".join(relevant_texts) if relevant_texts else "特になし"
+
 
 def build_gemini_prompt(job, schema_info_text, antipattern_raw_text, master_dict_text):
     """外部ファイルからプロンプトを読み込み、変数を注入する"""
@@ -286,7 +305,7 @@ def build_gemini_prompt(job, schema_info_text, antipattern_raw_text, master_dict
             "query": job.query,
             "schema_info_text": schema_info_text,
             "antipattern_raw_text": antipattern_raw_text,
-            "master_dict_text": master_dict_text
+            "master_dict_text": master_dict_text,
         }
         # template.format() を使い、{} プレースホルダに辞書の中身を流し込む
         return template.format(**params)
@@ -294,6 +313,7 @@ def build_gemini_prompt(job, schema_info_text, antipattern_raw_text, master_dict
     except Exception as e:
         logger.error(f"Failed to build prompt from external file: {e}")
         return f"Analyze this SQL: {job.query}"
+
 
 def upload_report_to_gcs(bucket_name, report_content, customer_project_id):
     """Markdown形式のレポートを既存のGCSバケットへアップロード"""
@@ -316,9 +336,11 @@ def upload_report_to_gcs(bucket_name, report_content, customer_project_id):
         logger.error(f"Failed to upload report to GCS: {e}")
         return None
 
+
 def save_summary_for_workflow(bucket_name, text_summary, customer_project_id):
     """Workflowが通知用に読み取れるよう、固定パスにJSON保存する"""
-    if not bucket_name: return
+    if not bucket_name:
+        return
     try:
         storage_client = storage.Client(project=customer_project_id)
         bucket = storage_client.bucket(bucket_name)
@@ -328,20 +350,26 @@ def save_summary_for_workflow(bucket_name, text_summary, customer_project_id):
         data = {
             "text_summary": text_summary,
             "timestamp": str(datetime.datetime.now()),
-            "customer_project_id": customer_project_id
+            "customer_project_id": customer_project_id,
         }
-        blob.upload_from_string(json.dumps(data, ensure_ascii=False), content_type="application/json")
+        blob.upload_from_string(
+            json.dumps(data, ensure_ascii=False), content_type="application/json"
+        )
         logger.info("Summary JSON saved for Workflow.")
     except Exception as e:
         logger.error(f"Failed to save summary JSON: {e}")
+
 
 # ==========================================
 # メインプロセス
 # ==========================================
 
+
 def main():
     if not CUSTOMER_PROJECT_ID:
-        logger.error("CUSTOMER_PROJECT_ID is empty. Please run this job via Workflow with overrides.")
+        logger.error(
+            "CUSTOMER_PROJECT_ID is empty. Please run this job via Workflow with overrides."
+        )
         return
     if not SAAS_PROJECT_ID or not CUSTOMER_PROJECT_ID:
         logger.error("Environment variables SAAS_PROJECT_ID or CUSTOMER_PROJECT_ID are not set.")
@@ -351,7 +379,7 @@ def main():
     bq_client = bigquery.Client(project=SAAS_PROJECT_ID)
     customer_bq_client = bigquery.Client(project=CUSTOMER_PROJECT_ID)
     # バケットの疎通確認
-    storage_client = storage.Client(project=CUSTOMER_PROJECT_ID) # 顧客プロジェクト用
+    storage_client = storage.Client(project=CUSTOMER_PROJECT_ID)  # 顧客プロジェクト用
     if not check_bucket_exists(storage_client, GCS_BUCKET_NAME):
         return
 
@@ -397,8 +425,13 @@ def main():
     # 1. 各リージョンからのデータ収集
     for region in target_regions:
         # ストレージ分析
-        proposal = analyze_storage_pricing(bq_client, CUSTOMER_PROJECT_ID, region, storage_analysis_sql_template)
-        if "対象となるストレージデータがありません" not in proposal and "失敗しました" not in proposal:
+        proposal = analyze_storage_pricing(
+            bq_client, CUSTOMER_PROJECT_ID, region, storage_analysis_sql_template
+        )
+        if (
+            "対象となるストレージデータがありません" not in proposal
+            and "失敗しました" not in proposal
+        ):
             storage_proposals.append(f"### 📍 Region: {region}\n\n{proposal}\n")
         logger.info(f"[{region}] Start extracting the worst queries...")
 
@@ -409,7 +442,7 @@ def main():
             analyzer_email=analyzer_email,
             start_time_expr=start_time_expr,
             end_time_expr=end_time_expr,
-            limit=WORST_QUERY_LIMIT
+            limit=WORST_QUERY_LIMIT,
         )
         try:
             # リージョンを指定してINFORMATION_SCHEMAを取得
@@ -424,10 +457,11 @@ def main():
         sorted_billed = sorted(all_jobs, key=lambda x: x.billed_gb or 0.0, reverse=True)
         sorted_duration = sorted(all_jobs, key=lambda x: x.duration_seconds or 0, reverse=True)
         for rank, j in enumerate(sorted_billed, 1):
-            if j.job_id not in job_ranks: job_ranks[j.job_id] = {}
-            job_ranks[j.job_id]['cost_rank'] = rank
+            if j.job_id not in job_ranks:
+                job_ranks[j.job_id] = {}
+            job_ranks[j.job_id]["cost_rank"] = rank
         for rank, j in enumerate(sorted_duration, 1):
-            job_ranks[j.job_id]['duration_rank'] = rank
+            job_ranks[j.job_id]["duration_rank"] = rank
 
         worst_by_billed = sorted_billed[:WORST_QUERY_LIMIT]
         worst_by_duration = sorted_duration[:WORST_QUERY_LIMIT]
@@ -451,8 +485,8 @@ def main():
         gcs_url = upload_report_to_gcs(GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID)
         message = (
             "解析が完了しました。対象のワーストクエリは見つかりませんでした。"
-            if gcs_url else
-            "解析は完了しましたが、レポートの保存に失敗しました。"
+            if gcs_url
+            else "解析は完了しましたが、レポートの保存に失敗しました。"
         )
         save_summary_for_workflow(GCS_BUCKET_NAME, message, CUSTOMER_PROJECT_ID)
         return
@@ -476,14 +510,18 @@ def main():
 
         try:
             response = model.generate_content(prompt)
-            logger.info(f"Gemini Response for Job {job.job_id}:\n{response.text}\n{'-'*50}")
-            report_lines.append(f"### 🔍 ワーストクエリ {i}/{len(all_jobs)} (Job: `{job.job_id}`)\n")
+            logger.info(f"Gemini Response for Job {job.job_id}:\n{response.text}\n{'-' * 50}")
+            report_lines.append(
+                f"### 🔍 ワーストクエリ {i}/{len(all_jobs)} (Job: `{job.job_id}`)\n"
+            )
 
             # --- ランキング情報の追記 ---
             ranks = job_ranks.get(job.job_id, {})
-            cost_rank = ranks.get('cost_rank', '-')
-            duration_rank = ranks.get('duration_rank', '-')
-            report_lines.append(f"**【プロジェクト全体ランキング】**\n- スキャン量: ワースト **{cost_rank}位**\n- 実行時間: ワースト **{duration_rank}位**\n")
+            cost_rank = ranks.get("cost_rank", "-")
+            duration_rank = ranks.get("duration_rank", "-")
+            report_lines.append(
+                f"**【プロジェクト全体ランキング】**\n- スキャン量: ワースト **{cost_rank}位**\n- 実行時間: ワースト **{duration_rank}位**\n"
+            )
             # ---------------------------
 
             report_lines.append(response.text)
@@ -496,9 +534,18 @@ def main():
     gcs_url = upload_report_to_gcs(GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID)
 
     if gcs_url:
-        save_summary_for_workflow(GCS_BUCKET_NAME, "解析が完了しました。詳細はGCSのレポートを確認してください。", CUSTOMER_PROJECT_ID)
+        save_summary_for_workflow(
+            GCS_BUCKET_NAME,
+            "解析が完了しました。詳細はGCSのレポートを確認してください。",
+            CUSTOMER_PROJECT_ID,
+        )
     else:
-        save_summary_for_workflow(GCS_BUCKET_NAME, "解析が完了しましたが、レポートの保存に失敗しました。", CUSTOMER_PROJECT_ID)
+        save_summary_for_workflow(
+            GCS_BUCKET_NAME,
+            "解析が完了しましたが、レポートの保存に失敗しました。",
+            CUSTOMER_PROJECT_ID,
+        )
+
 
 if __name__ == "__main__":
     main()

@@ -9,15 +9,16 @@ from pydantic import BaseModel
 # --- ロガーの設定 ---
 # Cloud Runで時刻、ログレベル（INFO/ERROR等）、メッセージが綺麗に出力されるフォーマット
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+
 class AnalyzeRequest(BaseModel):
     query: str
+
 
 @app.post("/analyze")
 def analyze_query(req: AnalyzeRequest):
@@ -39,7 +40,7 @@ def analyze_query(req: AnalyzeRequest):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            timeout=60
+            timeout=60,
         )
 
         raw_output = result.stdout

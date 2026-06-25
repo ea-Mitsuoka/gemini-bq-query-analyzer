@@ -1,4 +1,5 @@
 """tools/ 配下スクリプトの軽量なユニットテスト。"""
+
 import importlib.util
 from pathlib import Path
 

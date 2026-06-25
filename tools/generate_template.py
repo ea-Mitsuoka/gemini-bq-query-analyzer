@@ -15,6 +15,7 @@ tenants.json への変換と GCS へのアップロードが行える。
     python tools/generate_template.py                       # ./tenants_template.csv
     python tools/generate_template.py ~/Downloads/t.xlsx    # Excel で出力
 """
+
 import csv
 import sys
 from pathlib import Path
@@ -35,13 +36,13 @@ COLUMNS = [
 
 # 各列の説明（標準出力での案内用）。upload_tenants.py のデフォルト値も併記。
 COLUMN_HELP = {
-    "tenant_id":                 "テナント識別子（必須・キーになる）",
-    "customer_project_id":       "顧客のGCPプロジェクトID",
-    "gcs_bucket_name":           "レポート格納用バケット名（顧客側で事前作成）",
-    "worst_query_limit":         "分析対象とするワーストクエリ数（空欄時の既定: 1）",
-    "time_range_interval":       "分析対象期間（空欄時の既定: 1 DAY）",
+    "tenant_id": "テナント識別子（必須・キーになる）",
+    "customer_project_id": "顧客のGCPプロジェクトID",
+    "gcs_bucket_name": "レポート格納用バケット名（顧客側で事前作成）",
+    "worst_query_limit": "分析対象とするワーストクエリ数（空欄時の既定: 1）",
+    "time_range_interval": "分析対象期間（空欄時の既定: 1 DAY）",
     "slack_webhook_secret_name": "Secret Manager のSecret名（空欄でSlack通知無効）",
-    "scheduler_cron":            "実行スケジュール（空欄時の既定: 0 9 * * *）",
+    "scheduler_cron": "実行スケジュール（空欄時の既定: 0 9 * * *）",
 }
 
 
