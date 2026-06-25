@@ -95,6 +95,7 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 │      └── deploy.yml             # CI/CD
 │
 ├── tools/                        # 管理用スクリプト
+│   ├── generate_template.py      # 空のテナント設定スプレッドシート(CSV/Excel)を生成
 │   ├── generate_configs.py       # GCSからテナント設定を読み込み設定ファイルを生成（CI/CD用）
 │   └── upload_tenants.py         # スプレッドシートをtenants.jsonに変換してGCSへアップロード
 │
@@ -416,13 +417,23 @@ echo -n "${WEBHOOK_URL}" | gcloud secrets versions add ${SECRET_NAME} \
 }
 ```
 
-既存のスプレッドシートからCSV/Excelをダウンロードして変換する場合は `upload_tenants.py` を使う。
+スプレッドシートで管理する場合は、まず `generate_template.py` で空のテンプレートを生成し、編集してから `upload_tenants.py` で変換・アップロードする。
 
 ```bash
-# CSV または Excel から変換してGCSへアップロード（openpyxlはExcelのみ必要）
+# 1. 空のテンプレートを生成（.xlsx を指定すると Excel 形式で出力。既定は ./tenants_template.csv）
+python tools/generate_template.py
+
+# 2. 生成された tenants_template.csv を編集してテナント情報を記入
+#    列: tenant_id, customer_project_id, gcs_bucket_name, worst_query_limit,
+#        time_range_interval, slack_webhook_secret_name, scheduler_cron
+
+# 3. CSV または Excel から変換してGCSへアップロード（openpyxlはExcelのみ必要）
 pip install google-cloud-storage openpyxl
-python tools/upload_tenants.py ~/Downloads/tenants.csv
+python tools/upload_tenants.py tenants_template.csv
 ```
+
+> [!NOTE]
+> `upload_tenants.py` は空欄の列にデフォルト値を補完する（`worst_query_limit`=1, `time_range_interval`=1 DAY, `scheduler_cron`=0 9 \* \* \*, `slack_webhook_secret_name`=空）。
 
 手動でJSONを作成する場合はGCSへ直接アップロードする。
 
