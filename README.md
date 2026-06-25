@@ -96,6 +96,8 @@ gemini-bq-query-analyzer/ (Gitリポジトリのルート)
 │      └── deploy.yml             # CI/CD
 │
 ├── tools/                        # 管理用スクリプト
+│   ├── setup.sh                  # 初回必須の gcloud 認証等を対話実行（make setup）
+│   ├── check.sh                  # 環境が整っているか確認（make check）
 │   ├── ensure_state_bucket.py    # backend(tfstate)バケットを冪等に作成・堅牢化・権限付与
 │   ├── generate_template.py      # 空のテナント設定スプレッドシート(CSV/Excel)を生成
 │   ├── generate_configs.py       # GCSからテナント設定を読み込み設定ファイルを生成（CI/CD用）

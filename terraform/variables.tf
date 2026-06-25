@@ -20,6 +20,14 @@ variable "bq_dataset_id" {
   default = "audit_master"
 }
 
+# 削除保護フラグ。false の間は make destroy がゲートで拒否される。
+# また BigQuery データセットは allow_destroy=true のときのみ中身ごと破棄を許可する。
+# 破棄したい場合は true に変更して apply（make unlock）した上で destroy（make destroy）する。
+variable "allow_destroy" {
+  type    = bool
+  default = false
+}
+
 variable "tenants" {
   type = map(object({
     customer_project_id       = string

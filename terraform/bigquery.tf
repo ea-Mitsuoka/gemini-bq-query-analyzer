@@ -6,6 +6,9 @@ resource "google_bigquery_dataset" "audit_master" {
   location    = var.region
   description = "Dataset for Gemini Query Analyzer Master Data"
 
+  # allow_destroy=true のときのみ、テーブルを含むデータセットの破棄を許可する
+  delete_contents_on_destroy = var.allow_destroy
+
   # APIが有効化された後に作成を開始します
   depends_on = [terraform_data.api_completion]
 }
