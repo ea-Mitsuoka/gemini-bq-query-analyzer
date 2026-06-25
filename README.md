@@ -7,6 +7,7 @@ BigQueryの `INFORMATION_SCHEMA` からワーストクエリを抽出し、Gemin
 - [🏗️ アーキテクチャ図](#%EF%B8%8F-%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3%E5%9B%B3)
 - [📁 ディレクトリ構成](#-%E3%83%87%E3%82%A3%E3%83%AC%E3%82%AF%E3%83%88%E3%83%AA%E6%A7%8B%E6%88%90)
 - [🛑 前提条件](#-%E5%89%8D%E6%8F%90%E6%9D%A1%E4%BB%B6)
+- [🛠 開発・運用コマンド（Make）](#-%E9%96%8B%E7%99%BA%E9%81%8B%E7%94%A8%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89make)
 - [☁️ 環境構築](#%EF%B8%8F-%E7%92%B0%E5%A2%83%E6%A7%8B%E7%AF%89)
 - [Terraformによる構築（推奨）](#terraform%E3%81%AB%E3%82%88%E3%82%8B%E6%A7%8B%E7%AF%89%E6%8E%A8%E5%A5%A8)
 - [gcloudによる手動構築](#gcloud%E3%81%AB%E3%82%88%E3%82%8B%E6%89%8B%E5%8B%95%E6%A7%8B%E7%AF%89)
@@ -80,46 +81,52 @@ flowchart LR
 
 ## 📁 ディレクトリ構成
 
-- `base_config.ini`: Terraformの初回セットアップ時に参照される基本設定ファイル。SaaSプロジェクトIDやTerraformバックエンドのGCSバケット名などを定義します。
-- `env.txt`: `gcloud`による手動構築やローカルでの動作確認に使用される環境変数ファイル。CI/CDの実行結果として生成されます。
+- `base_config.ini`: SaaS プロジェクト ID・リージョン・GCS バケット名を定義する基本設定（**Git 管理**）。`generate_configs.py` と `ensure_state_bucket.py` がこれを参照する。
+- `pyproject.toml` / `uv.lock`: 管理ツールの Python 依存を固定（`make install` = `uv sync`）。
+- `.terraform-version`: tfenv 用に Terraform バージョンを固定（`1.15.7`）。
+- **生成物（Git 除外）**: `env.txt` / `terraform/terraform.tfvars` / `terraform/backend.tf` / `tenants.json` は CI またはツールが自動生成する。
 
 ```plaintext
-gemini-bq-query-analyzer/ (Gitリポジトリのルート)
-├── base_config.ini               # Terraform初回セットアップ用の設定ファイル
-├── Makefile                      # make init/plan/apply 等の運用タスク
-├── env.txt                       # ローカル環境変数（Git除外）
-├── tenants.json                  # テナント設定（Git除外）
+gemini-bq-query-analyzer/ (Git リポジトリのルート)
+├── Makefile                      # make install/setup/check/deploy 等の運用タスク
+├── base_config.ini               # 基本設定（SaaSプロジェクトID・リージョン・バケット名）
+├── pyproject.toml                # 管理ツールの依存定義（uv）
+├── uv.lock                       # 依存のロック（再現性）
+├── .terraform-version            # Terraform バージョン固定（tfenv, 1.15.7）
+├── ruff.toml / .mdformat.toml    # lint / format 設定
+├── env.txt                       # 生成物・ローカル環境変数（Git除外）
+├── tenants.json                  # 生成物・テナント設定（Git除外）
 ├── .gitignore
 │
 ├── .github/
 │   └── workflows/
-│      └── deploy.yml             # CI/CD
+│      ├── ci.yml                 # push/PR で make lint + make test（品質ゲート）
+│      └── deploy.yml             # 手動デプロイ（generate→ensure-bucket→terraform apply）
 │
 ├── tools/                        # 管理用スクリプト
 │   ├── setup.sh                  # 初回必須の gcloud 認証等を対話実行（make setup）
 │   ├── check.sh                  # 環境が整っているか確認（make check）
 │   ├── ensure_state_bucket.py    # backend(tfstate)バケットを冪等に作成・堅牢化・権限付与
 │   ├── generate_template.py      # 空のテナント設定スプレッドシート(CSV/Excel)を生成
-│   ├── generate_configs.py       # GCSからテナント設定を読み込み設定ファイルを生成（CI/CD用）
+│   ├── generate_configs.py       # GCSからテナント設定を読み込み設定ファイルを生成
 │   └── upload_tenants.py         # スプレッドシートをtenants.jsonに変換してGCSへアップロード
 │
-├── terraform/                    # インフラ定義
-│   ├── main.tf
-│   ├── variables.tf
-│   ├── terraform.tfvars          # terraform環境変数（Git除外）
-│   └── ...
+├── tests/                        # pytest（make test）
 │
-├── workflows/                    # Workflowの定義ファイルを格納する専用ディレクトリ
-│   └── analyzer_workflow.yaml    # 実際の実行フロー（YAML）
+├── terraform/                    # インフラ定義
+│   ├── main.tf / variables.tf / iam.tf / bigquery.tf / cloud_run_*.tf ...
+│   ├── .terraform.lock.hcl       # プロバイダのロック（Git管理）
+│   ├── terraform.tfvars          # 生成物（Git除外）
+│   └── backend.tf                # 生成物（Git除外）
+│
+├── workflows/
+│   └── analyzer_workflow.yaml    # 実行フロー（Job起動→完了待ち→Slack通知）
 │
 ├── main-app/                     # 🔍 メインの分析ツール（Cloud Run Job）
-│   ├── src/
-│   │   └── main.py               # メインスクリプト
-│   ├── sql/
-│   │   ├── antipattern-list.sql  # masterテーブル作成(traformからも読み込みます)
-│   │   ├── worst_ranking.sql
-│   │   └── logical_vs_physical_storage_analysis.sql
-│   ├── requirements.txt          # vertexai, google-cloud-bigquery 等
+│   ├── src/main.py               # メインスクリプト
+│   ├── sql/                      # worst_ranking 等の分析SQL
+│   ├── prompts/gemini_prompt.txt # Geminiプロンプト
+│   ├── requirements.txt          # コンテナ用依存（vertexai, google-cloud-bigquery 等）
 │   └── Dockerfile                # PythonベースのJob用コンテナ定義
 │
 └── bq-antipattern-api/           # ⚙️ 構文解析API（Cloud Run Service）
@@ -134,6 +141,10 @@ ______________________________________________________________________
 
 本ツールをセットアップする前に、お使いの環境が以下の要件を満たしていることを確認してください。
 
+- **ローカルツール**:
+  - **Google Cloud SDK**(`gcloud`) / **GNU Make**
+  - **uv**（Python 依存管理。`make install` で `.venv` を構築）
+  - **Terraform**（**tfenv** 経由を推奨。`.terraform-version` でバージョンを `1.15.7` に固定。`tfenv install` で導入）
 - **Google Cloud SDK**: `gcloud` コマンドがインストールされ、認証済みであること。
 - **Google Cloud プロジェクト**:
   - SaaS基盤をホストするためのGoogle Cloud プロジェクト（以下、SaaSプロジェクト）が準備されていること。
@@ -146,9 +157,55 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
+## 🛠 開発・運用コマンド（Make）
+
+日常の操作は `Makefile` に集約されています（`make help` で一覧表示）。
+
+| ターゲット                  | 説明                                                                                                   |
+| :-------------------------- | :----------------------------------------------------------------------------------------------------- |
+| `make install`              | uv で `.venv` を作成し依存を同期（`uv sync`）。tfenv があれば `.terraform-version` の Terraform も導入 |
+| `make setup`                | 初回必須の gcloud 認証・プロジェクト設定を対話実行                                                     |
+| `make check`                | 環境確認（gcloud/terraform/認証/API/バケット/tenants.json）                                            |
+| `make template`             | 空のテナント設定スプレッドシート(CSV/Excel)を生成                                                      |
+| `make generate`             | GCS の `tenants.json` から `terraform.tfvars` / `backend.tf` / `env.txt` を生成                        |
+| `make ensure-bucket`        | backend(tfstate)バケットを冪等に作成・堅牢化(versioning/UBLA/PAP)・deployer SA へ権限付与              |
+| `make init`                 | `ensure-bucket` → `generate` → `terraform init`                                                        |
+| `make format`               | ruff / terraform fmt / mdformat で一括整形（**書き込み**）                                             |
+| `make lint`                 | 上記の**非破壊検査**（CI と同じゲート）                                                                |
+| `make test`                 | pytest                                                                                                 |
+| `make plan`                 | `terraform plan`                                                                                       |
+| `make deploy`               | `terraform apply -auto-approve`（確認なし）                                                            |
+| `make unlock` / `make lock` | 削除保護の解除 / 再有効化（`allow_destroy`）                                                           |
+| `make destroy`              | `terraform destroy`（事前に `make unlock` が必要）                                                     |
+| `make clean`                | 生成された設定ファイルを削除（tfstate / `.venv` は保持）                                               |
+
+### ローカル開発フロー
+
+```bash
+make install     # .venv + 依存 + terraform を用意
+make setup       # gcloud 認証（初回のみ）
+make check       # 環境が整っているか確認
+make format      # コミット前に整形
+make lint test   # 検査とテスト
+```
+
+### CI/CD
+
+- **`ci.yml`**: push / PR で `make lint` + `make test` を実行する品質ゲート（クラウド認証不要）。
+- **`deploy.yml`**: 手動実行（Manual Deploy）で `ensure_state_bucket.py` → `generate_configs.py` → `terraform apply` を実行。Python 依存は `uv sync --no-dev` で `uv.lock` から導入。
+
+> [!NOTE]
+> `make deploy` / `make init` を実行すると、`base_config.ini` で指定した tfstate バケットが存在しない場合は自動で作成・堅牢化されます（手動でのバケット作成は不要）。
+
+______________________________________________________________________
+
 ## ☁️ 環境構築
 
 ### Terraformによる構築（推奨）
+
+> [!NOTE]
+> 以下は SaaS 基盤の**初回ブートストラップ**手順です（サービスアカウント・WIF・api-jar バケット・Secret 等、Terraform 管理外の前提を作る）。
+> 一度ブートストラップが済んだ後の通常運用では、**tfstate バケットの作成・権限付与・設定生成・デプロイは `make deploy` に集約**されています（手順 3〜4 の tfstate バケット手動作成は `ensure_state_bucket.py` が代替）。
 
 #### 1. gcloud SDKの認証
 
@@ -821,27 +878,23 @@ done
 
 ## 🗑️ 環境破棄
 
-### 1. `backend.tf`と`terraform.tfvars`の配置
+削除保護フラグ `allow_destroy`（既定 `false`）があるため、破棄は 2 段階で行います。
 
-- 一旦、Github ActionsでRun workflowを実行して生成した環境ファイルをダウンロード
-- `terraform/terrform.tfvars`に配置
+### 1. 設定ファイルを用意
 
-```bash
-cd Downloads/deployment-configs
-cp terraform/{backend.tf,terraform.tfvars} ~/gemini-bq-query-analyzer/terraform/
-```
-
-### 2. SaaSプロジェクトのmasterテーブルを削除
+ローカルに `terraform/backend.tf` / `terraform.tfvars` が無い場合は、GCS の `tenants.json` から再生成します。
 
 ```bash
-bq rm -r -f -d ${saas_project_id}:audit_master
+make generate
 ```
 
-### 3. `terraform destroy`
-
-先に`terraform state list`や`terraform plan`で内容を確認して注意して実施する
+### 2. 削除保護を解除して破棄
 
 ```bash
-cd terraform
-terraform destroy
+make plan       # 破棄対象を事前確認（任意だが推奨）
+make unlock     # allow_destroy=true を設定し apply（保護解除を反映）
+make destroy    # terraform destroy（unlock 済みでないとゲートで拒否される）
 ```
+
+> [!WARNING]
+> `audit_master` データセットは `allow_destroy=true` のとき中身（マスタテーブル）ごと破棄されます。手動での `bq rm` は不要です。再び保護したい場合は `make lock` を実行してください。
