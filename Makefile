@@ -21,6 +21,9 @@ PROTECT_TFVARS := $(TF_DIR)/allow_destroy.auto.tfvars
 # lint / 対象 Python パス
 PY_SRC  := tools main-app/src bq-antipattern-api/app.py tests
 
+# mdformat 対象 Markdown（git 管理下のみ。.venv 等の依存物や gitignore 対象を自動除外）
+MD_FILES := $(shell git ls-files '*.md')
+
 .DEFAULT_GOAL := help
 
 .PHONY: help install setup check template generate ensure-bucket ensure-bucket-dry-run \
@@ -61,13 +64,13 @@ format:  ## 自動整形（書き込み）: ローカル開発者用。Python/Te
 	-$(PYTHON) -m ruff check --fix $(PY_SRC)
 	$(PYTHON) -m ruff format $(PY_SRC)
 	cd $(TF_DIR) && $(TF) fmt -recursive
-	$(PYTHON) -m mdformat .
+	$(PYTHON) -m mdformat $(MD_FILES)
 
 lint:  ## 検査のみ（非破壊）: CI 用。整形差分があれば失敗
 	$(PYTHON) -m ruff check $(PY_SRC)
 	$(PYTHON) -m ruff format --check $(PY_SRC)
 	cd $(TF_DIR) && $(TF) fmt -check -recursive
-	$(PYTHON) -m mdformat --check .
+	$(PYTHON) -m mdformat --check $(MD_FILES)
 
 test:  ## pytest 実行
 	$(PYTHON) -m pytest
