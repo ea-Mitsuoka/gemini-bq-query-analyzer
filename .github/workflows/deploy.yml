@@ -48,9 +48,11 @@ jobs:
             terraform/backend.tf
           retention-days: 1
 
-      # 4. Terraformセットアップ
+      # 4. Terraformセットアップ（.terraform-version と同じバージョンに固定）
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.7"
 
       # 5. Terraform Init & Apply
       - name: Terraform Init & Apply

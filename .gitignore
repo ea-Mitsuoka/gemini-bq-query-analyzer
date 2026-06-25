@@ -1,7 +1,6 @@
 # Terraform files to ignore
 .terraform/
 .terraform.lock.hcl
-.terraform-version
 *.tfstate
 *.tfstate.*
 *.tfvars
