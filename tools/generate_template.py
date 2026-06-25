@@ -15,8 +15,8 @@ tenants.json への変換と GCS へのアップロードが行える。
     python tools/generate_template.py                       # ./tenants_template.csv
     python tools/generate_template.py ~/Downloads/t.xlsx    # Excel で出力
 """
-import sys
 import csv
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.parent

@@ -110,14 +110,16 @@ curl -X POST "<cloud run service url>/analyze" \
 提供されたBigQuery SQLを解析し、アンチパターンを返します。
 
 **Request Body (`application/json`)**
-| パラメータ | 型 | 説明 |
-| :--- | :--- | :--- |
-| `query` | `string` | 解析対象のBigQuery SQLクエリ |
+
+| パラメータ | 型       | 説明                         |
+| :--------- | :------- | :--------------------------- |
+| `query`    | `string` | 解析対象のBigQuery SQLクエリ |
 
 **Response (`application/json`)**
-| パラメータ | 型 | 説明 |
-| :--- | :--- | :--- |
-| `status` | `string` | 処理のステータス (`success` またはエラー時) |
+
+| パラメータ        | 型       | 説明                                                                                        |
+| :---------------- | :------- | :------------------------------------------------------------------------------------------ |
+| `status`          | `string` | 処理のステータス (`success` またはエラー時)                                                 |
 | `recommendations` | `string` | 抽出されたアンチパターンのリスト。問題がない場合は `"No anti-patterns found."` が返ります。 |
 
 **レスポンス例:**

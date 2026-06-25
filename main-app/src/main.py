@@ -1,18 +1,18 @@
-import os
-import logging
-import requests
 import datetime
 import json
+import logging
+import os
 from functools import lru_cache
+
 import google.auth
 import google.auth.transport.requests
 import google.oauth2.id_token
-from google.cloud import bigquery
-from google.cloud import storage
-from google.api_core.exceptions import NotFound, Forbidden
+import requests
 import vertexai
-from vertexai.generative_models import GenerativeModel
 from dotenv import load_dotenv
+from google.api_core.exceptions import Forbidden, NotFound
+from google.cloud import bigquery, storage
+from vertexai.generative_models import GenerativeModel
 
 # --- ロギングの設定 ---
 logging.basicConfig(

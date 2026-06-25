@@ -56,7 +56,7 @@ init: ensure-bucket generate  ## バケット準備 -> 設定生成 -> terraform
 	cd $(TF_DIR) && $(TF) init
 
 format:  ## 自動整形（書き込み）: ローカル開発者用。Python/Terraform/Markdown を一括整形
-	$(PYTHON) -m ruff check --fix $(PY_SRC)
+	-$(PYTHON) -m ruff check --fix $(PY_SRC)
 	cd $(TF_DIR) && $(TF) fmt -recursive
 	$(PYTHON) -m mdformat .
 

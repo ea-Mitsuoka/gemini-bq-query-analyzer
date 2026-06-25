@@ -11,12 +11,12 @@
     worst_query_limit, time_range_interval,
     slack_webhook_secret_name, scheduler_cron
 """
-import os
-import sys
-import json
-import csv
 import configparser
+import csv
+import json
+import sys
 from pathlib import Path
+
 from google.cloud import storage
 
 BASE_DIR = Path(__file__).parent.parent

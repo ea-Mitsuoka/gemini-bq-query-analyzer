@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import subprocess
+import logging
 import os
 import re
-import logging
+import subprocess
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 # --- ロガーの設定 ---
 # Cloud Runで時刻、ログレベル（INFO/ERROR等）、メッセージが綺麗に出力されるフォーマット

@@ -15,13 +15,13 @@ backend 初期化より前（terraform init の直前）に毎回実行する想
 デプロイ用SAは base_config.ini の [gcp] deployer_service_account、
 または環境変数 DEPLOYER_SA で上書きできる（既定: terraform-deployer-sa@<saas>.iam.gserviceaccount.com）。
 """
+import configparser
 import os
 import sys
-import configparser
 from pathlib import Path
 
-from google.cloud import storage
 from google.api_core import exceptions as gcp_exceptions
+from google.cloud import storage
 
 BASE_DIR = Path(__file__).parent.parent
 BASE_CONFIG_INI = BASE_DIR / "base_config.ini"

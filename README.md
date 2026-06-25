@@ -249,11 +249,11 @@ gcloud iam service-accounts create terraform-deployer-sa \
 
 \# ワークロード用サービスアカウントに必要なIAMロール
 
-| 行番号 | 表示名 | ロール識別子 | 利用目的 |
-| :--- | :--- | :--- | :--- |
-| 1 | BigQuery メタデータ閲覧者 | roles/bigquery.metadataViewer | 改善対象のテーブルのスキーマ等を読み取り |
-| 2 | BigQuery リソース閲覧者 | roles/bigquery.resourceViewer | INFOMATION_SCHEMAからジョブ履歴の読み取り |
-| 3 | Storage オブジェクト管理者 | roles/storage.objectAdmin | 診断レポートをGCSバケットへ納品 |
+| 行番号 | 表示名                     | ロール識別子                  | 利用目的                                  |
+| :----- | :------------------------- | :---------------------------- | :---------------------------------------- |
+| 1      | BigQuery メタデータ閲覧者  | roles/bigquery.metadataViewer | 改善対象のテーブルのスキーマ等を読み取り  |
+| 2      | BigQuery リソース閲覧者    | roles/bigquery.resourceViewer | INFOMATION_SCHEMAからジョブ履歴の読み取り |
+| 3      | Storage オブジェクト管理者 | roles/storage.objectAdmin     | 診断レポートをGCSバケットへ納品           |
 
 ```bash
 CUSTOMER_GCS_BUCKET_NAME=""
@@ -281,21 +281,21 @@ gcloud storage buckets add-iam-policy-binding "gs://${CUSTOMER_GCS_BUCKET_NAME}"
 
 \# Terraform実行用サービスアカウントに必要なIAMロール
 
-| 行番号 | 表示名 | ロール識別子 | 利用目的 |
-| :--- | :--- | :--- | :--- |
-| 1 | Artifact Registry 管理者 | roles/artifactregistry.admin | Dockerリポジトリの作成および削除 |
-| 2 | BigQuery データ管理者 | roles/bigquery.dataOwner | BigQueryのデータセットとテーブルを作成および削除 |
-| 3 | BigQuery ジョブユーザー | roles/bigquery.jobUser | BigQueryのテーブル読み取り,DDL実行 |
-| 4 | Cloud Build 編集者 | roles/cloudbuild.builds.editor | Cloud Build を実行する権限 |
-| 5 | Cloud Run 開発者 | roles/run.developer | Cloud Runサービスやジョブの作成および削除 |
-| 6 | Project IAM 管理者 | roles/resourcemanager.projectIamAdmin | IAMロールを付与する権限 |
-| 7 | Service Usage Admin | roles/serviceusage.serviceUsageAdmin | APIを有効化 |
-| 8 | サービス アカウント ユーザー | roles/iam.serviceAccountUser | Cloud Buildの実行,Workflowsへの紐付け |
-| 9 | サービス アカウント 管理者 | roles/iam.serviceAccountAdmin | サービスアカウント作成および削除 |
-| 10 | Storage 管理者 | roles/storage.Admin | tfstateファイルを格納するBackendバケットに書き込み |
-| 11 | Cloud Scheduler 管理者 | roles/cloudscheduler.admin | ジョブの作成および削除 |
-| 12 | Workflows 編集者 | roles/workflows.editor | workflowの作成および削除 |
-| 13 | 閲覧者 | roles/viewer | Secret ManagerのSlack Webhook URLの確認, ビルドログの確認など |
+| 行番号 | 表示名                       | ロール識別子                          | 利用目的                                                      |
+| :----- | :--------------------------- | :------------------------------------ | :------------------------------------------------------------ |
+| 1      | Artifact Registry 管理者     | roles/artifactregistry.admin          | Dockerリポジトリの作成および削除                              |
+| 2      | BigQuery データ管理者        | roles/bigquery.dataOwner              | BigQueryのデータセットとテーブルを作成および削除              |
+| 3      | BigQuery ジョブユーザー      | roles/bigquery.jobUser                | BigQueryのテーブル読み取り,DDL実行                            |
+| 4      | Cloud Build 編集者           | roles/cloudbuild.builds.editor        | Cloud Build を実行する権限                                    |
+| 5      | Cloud Run 開発者             | roles/run.developer                   | Cloud Runサービスやジョブの作成および削除                     |
+| 6      | Project IAM 管理者           | roles/resourcemanager.projectIamAdmin | IAMロールを付与する権限                                       |
+| 7      | Service Usage Admin          | roles/serviceusage.serviceUsageAdmin  | APIを有効化                                                   |
+| 8      | サービス アカウント ユーザー | roles/iam.serviceAccountUser          | Cloud Buildの実行,Workflowsへの紐付け                         |
+| 9      | サービス アカウント 管理者   | roles/iam.serviceAccountAdmin         | サービスアカウント作成および削除                              |
+| 10     | Storage 管理者               | roles/storage.Admin                   | tfstateファイルを格納するBackendバケットに書き込み            |
+| 11     | Cloud Scheduler 管理者       | roles/cloudscheduler.admin            | ジョブの作成および削除                                        |
+| 12     | Workflows 編集者             | roles/workflows.editor                | workflowの作成および削除                                      |
+| 13     | 閲覧者                       | roles/viewer                          | Secret ManagerのSlack Webhook URLの確認, ビルドログの確認など |
 
 ```bash
 ROLES=(
@@ -437,7 +437,7 @@ python tools/upload_tenants.py tenants_template.csv
 ```
 
 > [!NOTE]
-> `upload_tenants.py` は空欄の列にデフォルト値を補完する（`worst_query_limit`=1, `time_range_interval`=1 DAY, `scheduler_cron`=0 9 \* \* \*, `slack_webhook_secret_name`=空）。
+> `upload_tenants.py` は空欄の列にデフォルト値を補完する（`worst_query_limit`=1, `time_range_interval`=1 DAY, `scheduler_cron`=0 9 * * \*, `slack_webhook_secret_name`=空）。
 
 手動でJSONを作成する場合はGCSへ直接アップロードする。
 
