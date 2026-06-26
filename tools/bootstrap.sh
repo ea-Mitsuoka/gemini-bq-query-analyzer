@@ -72,7 +72,7 @@ for ROLE in "${DEPLOYER_ROLES[@]}"; do
 done
 
 # Cloud Build のビルド実行 SA（Compute Engine デフォルト SA）にソース読み取り等を付与。
-# 近所の Cloud Build は新規プロジェクトでこの SA を使うため、未付与だと
+# 近年の Cloud Build は新規プロジェクトでこの SA を使うため、未付与だと
 # `gcloud builds submit` が storage.objects.get 403 で失敗する。
 PROJECT_NUMBER=$(gcloud projects describe "${PROJECT}" --format='value(projectNumber)' 2>/dev/null || true)
 if [ -z "${PROJECT_NUMBER}" ]; then
