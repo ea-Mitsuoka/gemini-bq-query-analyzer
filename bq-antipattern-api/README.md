@@ -90,12 +90,16 @@ gcloud run deploy bq-antipattern-api \
 ローカルからデプロイしたサービスへテストコマンドを実行する方法
 
 ```bash
-# 1. あなたのGoogleアカウントの認証トークンを取得して変数(TOKEN)に格納します
+# 1. サービス URL を取得（PROJECT / REGION は環境に合わせて変更）
+URL=$(gcloud run services describe bq-antipattern-api \
+  --project="${SAAS_PROJECT_ID}" --region="${REGION}" --format='value(status.url)')
+
+# 2. 認証トークンを取得（短命。平文で保存しないこと）
 TOKEN=$(gcloud auth print-identity-token)
 
-# 2. curlコマンドを使って、トークン付きで /analyze エンドポイントにPOSTリクエストを送ります
-# （あえてアンチパターンである「SELECT *」をテスト用のクエリとして投げてみます）
-curl -X POST "<cloud run service url>/analyze" \
+# 3. /analyze に POST（複数のアンチパターンを踏むテストクエリ:
+#    SELECT * / CTE多重評価 / IN (SELECT ...) / ORDER BY without LIMIT）
+curl -X POST "${URL}/analyze" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d '{

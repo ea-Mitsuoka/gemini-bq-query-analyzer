@@ -268,6 +268,12 @@ make upload-tenants FILE=tenants_template.csv  # tenants.json 化して GCS へ
 make secret TENANT=<tenant_id> URL=<webhook_url>
 ```
 
+> [!NOTE]
+> **分析対象期間について**
+>
+> - `time_range_interval`（相対指定。例 `7 DAY`）は **180 日以内**にしてください。`INFORMATION_SCHEMA.JOBS_BY_PROJECT` のジョブ履歴は約 180 日で消去されるため、それより前は分析できません。
+> - **絶対期間で指定**したい場合は、Cloud Run Job の環境変数で `TIME_RANGE_INTERVAL` を空にし、`TIME_RANGE_START` / `TIME_RANGE_END`（形式 `YYYY-MM-DD HH:MM:SS`）を設定します。これは Job 単位の指定で、`tenants.json`（テナント単位）には露出していません。
+
 #### 4. デプロイ
 
 ```bash

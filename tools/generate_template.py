@@ -40,7 +40,7 @@ COLUMN_HELP = {
     "customer_project_id": "顧客のGCPプロジェクトID",
     "gcs_bucket_name": "レポート格納用バケット名（顧客側で事前作成）",
     "worst_query_limit": "分析対象とするワーストクエリ数（空欄時の既定: 1）",
-    "time_range_interval": "分析対象期間（空欄時の既定: 1 DAY）",
+    "time_range_interval": "分析対象期間（空欄時の既定: 1 DAY。INFORMATION_SCHEMA の保持上限により180日以内）",
     "slack_webhook_secret_name": "Secret Manager のSecret名（空欄でSlack通知無効）",
     "scheduler_cron": "実行スケジュール（空欄時の既定: 0 9 * * *）",
 }
