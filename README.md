@@ -164,23 +164,29 @@ ______________________________________________________________________
 
 日常の操作は `Makefile` に集約されています（`make help` で一覧表示）。
 
-| ターゲット                  | 説明                                                                                                   |
-| :-------------------------- | :----------------------------------------------------------------------------------------------------- |
-| `make install`              | uv で `.venv` を作成し依存を同期（`uv sync`）。tfenv があれば `.terraform-version` の Terraform も導入 |
-| `make setup`                | 初回必須の gcloud 認証・プロジェクト設定を対話実行                                                     |
-| `make check`                | 環境確認（gcloud/terraform/認証/API/バケット/tenants.json）                                            |
-| `make template`             | 空のテナント設定スプレッドシート(CSV/Excel)を生成                                                      |
-| `make generate`             | GCS の `tenants.json` から `terraform.tfvars` / `backend.tf` / `env.txt` を生成                        |
-| `make ensure-bucket`        | backend(tfstate)バケットを冪等に作成・堅牢化(versioning/UBLA/PAP)・deployer SA へ権限付与              |
-| `make init`                 | `ensure-bucket` → `generate` → `terraform init`                                                        |
-| `make format`               | ruff / terraform fmt / mdformat で一括整形（**書き込み**）                                             |
-| `make lint`                 | 上記の**非破壊検査**（CI と同じゲート）                                                                |
-| `make test`                 | pytest                                                                                                 |
-| `make plan`                 | `terraform plan`                                                                                       |
-| `make deploy`               | `terraform apply -auto-approve`（確認なし）                                                            |
-| `make unlock` / `make lock` | 削除保護の解除 / 再有効化（`allow_destroy`）                                                           |
-| `make destroy`              | `terraform destroy`（事前に `make unlock` が必要）                                                     |
-| `make clean`                | 生成された設定ファイルを削除（tfstate / `.venv` は保持）                                               |
+| ターゲット                   | 説明                                                                                                                   |
+| :--------------------------- | :--------------------------------------------------------------------------------------------------------------------- |
+| `make help`                  | ターゲット一覧を表示（デフォルト）                                                                                     |
+| `make install`               | uv で `.venv` を作成し依存を同期（`uv sync`）。tfenv があれば `.terraform-version` の Terraform も導入                 |
+| `make setup`                 | gcloud 認証 + project id を `base_config.ini` に設定（対話）                                                           |
+| `make bootstrap`             | 初回ブートストラップ（SA作成 / SaaS IAM / api-jarバケット+JAR / WIF）を冪等に作成。`GITHUB_REPO=owner/name` で上書き可 |
+| `make github-secrets`        | GitHub Actions Secrets（`WIF_PROVIDER` / `SERVICE_ACCOUNT`）を `gh` で設定                                             |
+| `make check`                 | 環境確認（gcloud/terraform/認証/API/バケット/tenants.json）                                                            |
+| `make template`              | 空のテナント設定スプレッドシート(CSV/Excel)を生成                                                                      |
+| `make upload-tenants`        | テナント設定を GCS へアップロード（`FILE=...`、既定 `tenants_template.csv`）                                           |
+| `make secret`                | Slack Webhook を Secret Manager へ登録（`TENANT=<id> URL=<webhook>` 必須）                                             |
+| `make generate`              | GCS の `tenants.json` から `terraform.tfvars` / `backend.tf` / `env.txt` を生成                                        |
+| `make ensure-bucket`         | backend(tfstate)バケットを冪等に作成・堅牢化(versioning/UBLA/PAP)・deployer SA へ権限付与                              |
+| `make ensure-bucket-dry-run` | `ensure-bucket` の変更内容を確認のみ（書き込みなし）                                                                   |
+| `make init`                  | `ensure-bucket` → `generate` → `terraform init`                                                                        |
+| `make format`                | ruff / terraform fmt / mdformat で一括整形（**書き込み**）                                                             |
+| `make lint`                  | 上記の**非破壊検査**（CI と同じゲート）                                                                                |
+| `make test`                  | pytest                                                                                                                 |
+| `make plan`                  | `terraform plan`                                                                                                       |
+| `make deploy`                | `terraform apply -auto-approve`（確認なし）                                                                            |
+| `make unlock` / `make lock`  | 削除保護の解除 / 再有効化（`allow_destroy`）                                                                           |
+| `make destroy`               | `terraform destroy`（事前に `make unlock` が必要）                                                                     |
+| `make clean`                 | 生成された設定ファイルを削除（tfstate / `.venv` は保持）                                                               |
 
 ### ローカル開発フロー
 
