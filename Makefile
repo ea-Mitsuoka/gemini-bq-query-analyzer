@@ -88,6 +88,7 @@ lint:  ## 検査のみ（非破壊）: CI 用。整形差分があれば失敗
 	$(PYTHON) -m ruff format --check $(PY_SRC)
 	cd $(TF_DIR) && $(TF) fmt -check -recursive
 	$(PYTHON) -m mdformat --check $(MD_FILES)
+	$(PYTHON) tools/check_make_docs.py
 
 test:  ## pytest 実行
 	$(PYTHON) -m pytest
