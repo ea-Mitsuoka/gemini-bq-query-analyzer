@@ -72,9 +72,14 @@ for ROLE in "${DEPLOYER_ROLES[@]}"; do
 done
 
 # Cloud Build のビルド実行 SA（Compute Engine デフォルト SA）にソース読み取り等を付与。
-# 近年の Cloud Build は新規プロジェクトでこの SA を使うため、未付与だと
+# 近所の Cloud Build は新規プロジェクトでこの SA を使うため、未付与だと
 # `gcloud builds submit` が storage.objects.get 403 で失敗する。
-PROJECT_NUMBER=$(gcloud projects describe "${PROJECT}" --format='value(projectNumber)')
+PROJECT_NUMBER=$(gcloud projects describe "${PROJECT}" --format='value(projectNumber)' 2>/dev/null || true)
+if [ -z "${PROJECT_NUMBER}" ]; then
+  echo "エラー: プロジェクト番号の取得に失敗しました。gcloud の認証状態またはプロジェクトIDを確認してください。" >&2
+  exit 1
+fi
+
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 for ROLE in roles/cloudbuild.builds.builder roles/logging.logWriter; do
   gcloud projects add-iam-policy-binding "${PROJECT}" \
@@ -85,7 +90,13 @@ done
 echo "== [4/6] api-jar バケットを作成・堅牢化 =="
 if [ -z "$API_JAR_BUCKET" ] || [ "$API_JAR_BUCKET" = "<api_jar_bucket_name>" ]; then
   API_JAR_BUCKET="gemini-bq-analyzer-api-jar-${PROJECT}"
-  sed -i '' "s/^\s*api_jar_bucket_name.*/api_jar_bucket_name = ${API_JAR_BUCKET}/" base_config.ini
+  
+  # GNU sed (Linux) と BSD sed (macOS) のインプレース置換の互換性ケア
+  if sed --version >/dev/null 2>&1; then
+    sed -i "s/^\s*api_jar_bucket_name.*/api_jar_bucket_name = ${API_JAR_BUCKET}/" base_config.ini
+  else
+    sed -i '' "s/^\s*api_jar_bucket_name.*/api_jar_bucket_name = ${API_JAR_BUCKET}/" base_config.ini
+  fi
   echo "  api_jar_bucket_name を ${API_JAR_BUCKET} に設定しました（base_config.ini）"
 fi
 gcloud storage buckets describe "gs://${API_JAR_BUCKET}" >/dev/null 2>&1 \
