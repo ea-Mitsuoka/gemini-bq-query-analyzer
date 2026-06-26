@@ -58,7 +58,7 @@ gcloud iam service-accounts describe "${SA_DEPLOYER}" --project="${PROJECT}" >/d
   || gcloud iam service-accounts create terraform-deployer-sa \
        --display-name="Terraform SaaS Infrastructure Manager" --project="${PROJECT}"
 
-echo "== [3/6] デプロイ用 SA に SaaS IAM を付与 =="
+echo "== [3/6] デプロイ用 SA / Cloud Build 実行 SA に IAM を付与 =="
 DEPLOYER_ROLES=(
   roles/artifactregistry.admin roles/bigquery.dataOwner roles/bigquery.jobUser
   roles/cloudbuild.builds.editor roles/run.developer roles/resourcemanager.projectIamAdmin
@@ -68,6 +68,17 @@ DEPLOYER_ROLES=(
 for ROLE in "${DEPLOYER_ROLES[@]}"; do
   gcloud projects add-iam-policy-binding "${PROJECT}" \
     --member="serviceAccount:${SA_DEPLOYER}" --role="${ROLE}" \
+    --condition=None --no-user-output-enabled
+done
+
+# Cloud Build のビルド実行 SA（Compute Engine デフォルト SA）にソース読み取り等を付与。
+# 近年の Cloud Build は新規プロジェクトでこの SA を使うため、未付与だと
+# `gcloud builds submit` が storage.objects.get 403 で失敗する。
+PROJECT_NUMBER=$(gcloud projects describe "${PROJECT}" --format='value(projectNumber)')
+COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+for ROLE in roles/cloudbuild.builds.builder roles/logging.logWriter; do
+  gcloud projects add-iam-policy-binding "${PROJECT}" \
+    --member="serviceAccount:${COMPUTE_SA}" --role="${ROLE}" \
     --condition=None --no-user-output-enabled
 done
 
