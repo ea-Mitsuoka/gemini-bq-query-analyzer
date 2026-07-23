@@ -72,7 +72,7 @@ main:
                 switch:
                   - condition: $${arg.slack_webhook_secret_name != ""}
                     next: get_slack_url
-                next: end
+                next: return_result
             - get_slack_url:
                 call: googleapis.secretmanager.v1.projects.secrets.versions.access
                 args:
@@ -87,6 +87,9 @@ main:
                   url: $${slack_url}
                   body:
                     text: '$${"✅ BQ分析完了 [" + arg.tenant_id + "]\n" + report_json.body.text_summary + "\nレポート " + report_json.body.report_url}'
+            - return_result:
+                # 実行者（make run の当社オペレーター等）に要点＋署名付きURLを返す
+                return: $${report_json.body}
         except:
           as: e
           steps:

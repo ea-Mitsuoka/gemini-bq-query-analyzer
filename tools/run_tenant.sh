@@ -36,7 +36,13 @@ ARG=$(echo "$TENANTS_JSON" | jq -c --arg t "$TENANT" '.[$t] | {
   slack_webhook_secret_name: .slack_webhook_secret_name
 }')
 
-echo "オンデマンド実行: tenant=${TENANT}"
-gcloud workflows run gemini-bq-query-analyzer-workflow \
+echo "オンデマンド実行: tenant=${TENANT}（完了まで待機します）"
+RESULT=$(gcloud workflows run gemini-bq-query-analyzer-workflow \
   --project "$PROJECT" --location "$REGION" \
-  --data "$ARG"
+  --data "$ARG" --format="value(result)")
+
+# Workflow の返り値（要点＋署名付きURL）を実行者に表示する
+echo
+echo "===== 分析結果 ====="
+echo "$RESULT" | jq -r '"サマリ: " + (.text_summary // "N/A") + "\nレポート(署名付きURL、7日間有効):\n" + (.report_url // "N/A")' 2>/dev/null \
+  || echo "$RESULT"
