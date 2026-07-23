@@ -58,6 +58,11 @@ main:
             initial_delay: 2
             max_delay: 10
             multiplier: 2
+    - check_slack:
+        switch:
+          - condition: $${arg.slack_webhook_secret_name != ""}
+            next: get_slack_url
+        next: end
     - get_slack_url:
         call: googleapis.secretmanager.v1.projects.secrets.versions.access
         args:
