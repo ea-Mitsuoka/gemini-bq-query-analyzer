@@ -48,7 +48,7 @@ main:
                 next: wait_for_job
             - check_job_result:
                 switch:
-                  - condition: $${default(execution_status.failedCount, 0) > 0}
+                  - condition: $${default(map.get(execution_status, "failedCount"), 0) > 0}
                     next: raise_job_failure
                 next: get_report_json
             - raise_job_failure:
