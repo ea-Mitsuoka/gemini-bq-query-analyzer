@@ -52,7 +52,7 @@ main:
                     next: raise_job_failure
                 next: get_report_json
             - raise_job_failure:
-                raise: $${"Cloud Run Job did not succeed: " + job_execution.name}
+                raise: '$${"Cloud Run Job did not succeed. execution=" + job_execution.name}'
             - get_report_json:
                 try:
                   call: http.get
@@ -86,7 +86,7 @@ main:
                 args:
                   url: $${slack_url}
                   body:
-                    text: $${"✅ BQ分析完了 [" + arg.tenant_id + "]\n" + report_json.body.text_summary + "\nレポート: " + report_json.body.report_url}
+                    text: '$${"✅ BQ分析完了 [" + arg.tenant_id + "]\n" + report_json.body.text_summary + "\nレポート " + report_json.body.report_url}'
         except:
           as: e
           steps:
