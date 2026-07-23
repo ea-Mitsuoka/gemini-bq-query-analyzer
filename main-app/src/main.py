@@ -64,7 +64,9 @@ def check_bucket_exists(storage_client, bucket_name):
         return False
 
     try:
-        storage_client.get_bucket(bucket_name)
+        # roles/storage.objectAdmin で許可される objects.list でアクセス確認する。
+        # get_bucket() は storage.buckets.get を要求し objectAdmin に含まれないため使わない。
+        list(storage_client.list_blobs(bucket_name, max_results=1))
         logger.info(f"✅ Connection verified: GCS Bucket '{bucket_name}' is accessible.")
         return True
     except NotFound:
