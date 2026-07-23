@@ -30,7 +30,7 @@ MD_FILES := $(shell git ls-files '*.md')
 .DEFAULT_GOAL := help
 
 .PHONY: help install setup bootstrap github-secrets check template upload-tenants secret \
-        generate ensure-bucket ensure-bucket-dry-run init format lint test plan deploy \
+        generate ensure-bucket ensure-bucket-dry-run init format lint test plan deploy run \
         unlock lock destroy clean
 
 help:  ## このヘルプを表示
@@ -98,6 +98,10 @@ plan: init  ## terraform plan
 
 deploy: init  ## terraform apply（確認なし・多段でも一発）
 	cd $(TF_DIR) && $(TF) apply -auto-approve
+
+run:  ## 指定テナントの分析をオンデマンド実行（TENANT=<id> 必須。Schedulerと分離）
+	@test -n "$(TENANT)" || { echo "TENANT=<tenant_id> を指定してください"; exit 1; }
+	bash tools/run_tenant.sh "$(TENANT)"
 
 unlock:  ## 削除保護を解除（allow_destroy=true を書き込み apply）。実行後 make destroy 可能
 	@echo 'allow_destroy = true' > $(PROTECT_TFVARS)

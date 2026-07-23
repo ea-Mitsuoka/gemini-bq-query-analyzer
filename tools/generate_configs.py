@@ -34,6 +34,9 @@ def main():
         print(f"エラー: base_config.ini の設定項目が不足しています: {e}")
         sys.exit(1)
 
+    # 失敗通知の宛先メール（任意。未設定なら通知アラートは無効化される）
+    alert_email = config.get("gcp", "alert_notification_email", fallback="").strip()
+
     # 2. GCSからテナント設定を取得
     try:
         gcs_client = storage.Client()
@@ -69,9 +72,10 @@ def main():
         f.write("# ==========================================\n")
         f.write("# 共通設定 (SaaS 基盤側)\n")
         f.write("# ==========================================\n")
-        f.write(f'saas_project_id     = "{saas_id}"\n')
-        f.write(f'region              = "{region}"\n')
-        f.write(f'api_jar_bucket_name = "{api_jar_bucket}"\n\n')
+        f.write(f'saas_project_id          = "{saas_id}"\n')
+        f.write(f'region                   = "{region}"\n')
+        f.write(f'api_jar_bucket_name      = "{api_jar_bucket}"\n')
+        f.write(f'alert_notification_email = "{alert_email}"\n\n')
 
         f.write("# ==========================================\n")
         f.write("# マルチテナント設定 (マップ 形式)\n")

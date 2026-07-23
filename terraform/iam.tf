@@ -22,3 +22,11 @@ resource "google_project_iam_member" "saas_permissions" {
   role     = each.key
   member   = "serviceAccount:${data.google_service_account.analyzer_sa.email}"
 }
+
+# レポートの V4 署名付きURLを鍵レスで生成するため、SA が自身に対して
+# signBlob できるようにする（roles/iam.serviceAccountTokenCreator）。
+resource "google_service_account_iam_member" "analyzer_sa_token_creator" {
+  service_account_id = data.google_service_account.analyzer_sa.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${data.google_service_account.analyzer_sa.email}"
+}

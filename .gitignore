@@ -12,6 +12,8 @@ tools/token.json
 client_secrets.json
 .venv
 env.txt
+tenants.json
+tenants_template.csv
 
 # Automatically created terraform files
 

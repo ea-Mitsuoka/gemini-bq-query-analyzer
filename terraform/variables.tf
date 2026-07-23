@@ -11,6 +11,12 @@ variable "api_jar_bucket_name" {
   type = string
 }
 
+# 失敗通知の宛先メール（Slackチャンネルの Integration メール等）。空なら通知アラートを作らない。
+variable "alert_notification_email" {
+  type    = string
+  default = ""
+}
+
 # 変更すると顧客プロジェクトに影響が出るため要注意.原則としてDefaultのままにすること.
 variable "service_account_id" {
   default = "gemini-bq-query-analyzer-sa"

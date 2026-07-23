@@ -10,7 +10,9 @@ locals {
     "storage.googleapis.com",
     "workflows.googleapis.com",
     "artifactregistry.googleapis.com",
-    "secretmanager.googleapis.com"
+    "secretmanager.googleapis.com",
+    "monitoring.googleapis.com",
+    "logging.googleapis.com"
   ]
 }
 

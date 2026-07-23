@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import os
+import sys
 from functools import lru_cache
 
 import google.auth
@@ -30,6 +31,7 @@ CUSTOMER_PROJECT_ID = os.getenv("CUSTOMER_PROJECT_ID")
 BQ_ANTIPATTERN_API_URL = os.getenv("BQ_ANTIPATTERN_API_URL")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
 LOCATION = "us-central1"  # Vertex AIのリージョン
+REPORT_URL_EXPIRY_DAYS = 7  # レポート署名付きURLの有効期限（日）
 # 調査期間の環境変数を取得
 TIME_RANGE_INTERVAL = os.getenv("TIME_RANGE_INTERVAL", "1 DAY")
 TIME_RANGE_START = os.getenv("TIME_RANGE_START")
@@ -317,10 +319,32 @@ def build_gemini_prompt(job, schema_info_text, antipattern_raw_text, master_dict
         return f"Analyze this SQL: {job.query}"
 
 
-def upload_report_to_gcs(bucket_name, report_content, customer_project_id):
-    """Markdown形式のレポートを既存のGCSバケットへアップロード"""
-    if not bucket_name:
+def generate_report_signed_url(blob):
+    """ワークロードSAの signBlob（鍵レス）で V4 署名付きURLを生成する。
+
+    顧客プロジェクトのバケットに対し、閲覧者へ常設IAMを付与せずに
+    期限付きで閲覧させるために使う。SA には roles/iam.serviceAccountTokenCreator
+    （自身に対する signBlob 権限）が必要。
+    """
+    try:
+        credentials, _ = google.auth.default()
+        credentials.refresh(google.auth.transport.requests.Request())
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=datetime.timedelta(days=REPORT_URL_EXPIRY_DAYS),
+            method="GET",
+            service_account_email=credentials.service_account_email,
+            access_token=credentials.token,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to generate signed URL (report is still uploaded): {e}")
         return None
+
+
+def upload_report_to_gcs(bucket_name, report_content, customer_project_id):
+    """Markdownレポートをアップロードし、(コンソールURL, 署名付きURL) を返す。"""
+    if not bucket_name:
+        return None, None
     try:
         # 顧客のプロジェクトIDを指定してストレージクライアントを作成
         storage_client = storage.Client(project=customer_project_id)
@@ -333,14 +357,22 @@ def upload_report_to_gcs(bucket_name, report_content, customer_project_id):
         blob.upload_from_string(report_content, content_type="text/markdown")
         logger.info(f"Report uploaded to: gs://{bucket_name}/{filename}")
 
-        return f"https://console.cloud.google.com/storage/browser/_details/{bucket_name}/{filename}?project={customer_project_id}"
+        console_url = (
+            f"https://console.cloud.google.com/storage/browser/_details/"
+            f"{bucket_name}/{filename}?project={customer_project_id}"
+        )
+        signed_url = generate_report_signed_url(blob)
+        return console_url, signed_url
     except Exception as e:
         logger.error(f"Failed to upload report to GCS: {e}")
-        return None
+        return None, None
 
 
-def save_summary_for_workflow(bucket_name, text_summary, customer_project_id):
-    """Workflowが通知用に読み取れるよう、固定パスにJSON保存する"""
+def save_summary_for_workflow(bucket_name, text_summary, customer_project_id, report_url=""):
+    """Workflowが通知用に読み取れるよう、固定パスにJSON保存する。
+
+    report_url にはレポートの署名付きURLを入れる（通知本文に載せるため）。
+    """
     if not bucket_name:
         return
     try:
@@ -351,6 +383,7 @@ def save_summary_for_workflow(bucket_name, text_summary, customer_project_id):
 
         data = {
             "text_summary": text_summary,
+            "report_url": report_url or "",
             "timestamp": str(datetime.datetime.now()),
             "customer_project_id": customer_project_id,
         }
@@ -368,14 +401,12 @@ def save_summary_for_workflow(bucket_name, text_summary, customer_project_id):
 
 
 def main():
-    if not CUSTOMER_PROJECT_ID:
-        logger.error(
-            "CUSTOMER_PROJECT_ID is empty. Please run this job via Workflow with overrides."
-        )
-        return
     if not SAAS_PROJECT_ID or not CUSTOMER_PROJECT_ID:
-        logger.error("Environment variables SAAS_PROJECT_ID or CUSTOMER_PROJECT_ID are not set.")
-        return
+        # 設定不備は復旧不能なエラー。exit 1 で Workflow に失敗を伝える（サイレント失敗防止）。
+        logger.error(
+            "SAAS_PROJECT_ID / CUSTOMER_PROJECT_ID が未設定です。Workflow の overrides を確認してください。"
+        )
+        sys.exit(1)
 
     # クライアント初期化
     bq_client = bigquery.Client(project=SAAS_PROJECT_ID)
@@ -383,7 +414,9 @@ def main():
     # バケットの疎通確認
     storage_client = storage.Client(project=CUSTOMER_PROJECT_ID)  # 顧客プロジェクト用
     if not check_bucket_exists(storage_client, GCS_BUCKET_NAME):
-        return
+        # バケットにアクセスできない＝顧客側IAM未整備等。exit 1 で明示的に失敗させる。
+        logger.error("レポートバケットにアクセスできないため中断します（exit 1）。")
+        sys.exit(1)
 
     vertexai.init(project=SAAS_PROJECT_ID, location=LOCATION)
     model = GenerativeModel("gemini-3.5-flash")
@@ -394,7 +427,7 @@ def main():
         storage_analysis_sql_template = load_external_file(STORAGE_ANALYSIS_SQL_PATH)
     except Exception as e:
         logger.error(f"SQL file loading error: {e}")
-        return
+        sys.exit(1)
 
     # 基本情報の取得
     analyzer_email = get_current_user_email(bq_client)
@@ -410,6 +443,11 @@ def main():
 
     if not target_regions:
         logger.info("No active regions found.")
+        save_summary_for_workflow(
+            GCS_BUCKET_NAME,
+            "分析対象のリージョン（データセット）が見つかりませんでした。",
+            CUSTOMER_PROJECT_ID,
+        )
         return
 
     start_time_expr, end_time_expr = get_time_range_expressions()
@@ -484,13 +522,17 @@ def main():
         logger.info("No queries to analyze.")
         report_lines.append("対象のワーストクエリは見つかりませんでした。\n")
         final_report = "\n".join(report_lines)
-        gcs_url = upload_report_to_gcs(GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID)
+        console_url, signed_url = upload_report_to_gcs(
+            GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID
+        )
         message = (
             "解析が完了しました。対象のワーストクエリは見つかりませんでした。"
-            if gcs_url
+            if console_url
             else "解析は完了しましたが、レポートの保存に失敗しました。"
         )
-        save_summary_for_workflow(GCS_BUCKET_NAME, message, CUSTOMER_PROJECT_ID)
+        save_summary_for_workflow(
+            GCS_BUCKET_NAME, message, CUSTOMER_PROJECT_ID, report_url=signed_url or ""
+        )
         return
 
     # 5. 各ワーストクエリの解析
@@ -533,13 +575,16 @@ def main():
 
     # 7. レポートの結合と出力
     final_report = "\n".join(report_lines)
-    gcs_url = upload_report_to_gcs(GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID)
+    console_url, signed_url = upload_report_to_gcs(
+        GCS_BUCKET_NAME, final_report, CUSTOMER_PROJECT_ID
+    )
 
-    if gcs_url:
+    if console_url:
+        message = f"解析が完了しました。ワーストクエリ {len(all_jobs)} 件を分析しました。"
+        if not signed_url:
+            message += "（署名付きURLの生成に失敗したため、GCSから直接ご確認ください）"
         save_summary_for_workflow(
-            GCS_BUCKET_NAME,
-            "解析が完了しました。詳細はGCSのレポートを確認してください。",
-            CUSTOMER_PROJECT_ID,
+            GCS_BUCKET_NAME, message, CUSTOMER_PROJECT_ID, report_url=signed_url or ""
         )
     else:
         save_summary_for_workflow(

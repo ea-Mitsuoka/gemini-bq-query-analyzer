@@ -184,6 +184,7 @@ ______________________________________________________________________
 | `make test`                  | pytest                                                                                                                 |
 | `make plan`                  | `terraform plan`                                                                                                       |
 | `make deploy`                | `terraform apply -auto-approve`（確認なし）                                                                            |
+| `make run`                   | 指定テナントの分析をオンデマンド実行（`TENANT=<id>` 必須。Scheduler と分離）                                           |
 | `make unlock` / `make lock`  | 削除保護の解除 / 再有効化（`allow_destroy`）                                                                           |
 | `make destroy`               | `terraform destroy`（事前に `make unlock` が必要）                                                                     |
 | `make clean`                 | 生成された設定ファイルを削除（tfstate / `.venv` は保持）                                                               |
