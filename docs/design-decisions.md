@@ -5,6 +5,9 @@
 個別の重要決定は [ADR](adr/) を参照:
 
 - [ADR-0001: 通知チャネルの使い分け](adr/0001-notification-channels.md)
+- [ADR-0002: 失敗検知は Workflow 層で行う](adr/0002-failure-detection-workflow-layer.md)
+- [ADR-0003: 署名付きURLで配信する](adr/0003-signed-url-delivery.md)
+- [ADR-0004: Terraform state backend の方針](adr/0004-terraform-state-backend.md)
 
 ## 実行契機
 
