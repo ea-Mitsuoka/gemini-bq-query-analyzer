@@ -31,4 +31,22 @@ echo "SERVICE_ACCOUNT = ${SERVICE_ACCOUNT}"
 gh secret set WIF_PROVIDER --body "${WIF_PROVIDER}"
 gh secret set SERVICE_ACCOUNT --body "${SERVICE_ACCOUNT}"
 
+# 失敗通知の宛先。公開リポジトリに置けないため terraform/alert.auto.tfvars（Git管理外）から拾う。
+# 未設定のまま Actions からデプロイすると Monitoring のアラートが削除されるので警告する。
+ALERT_TFVARS="terraform/alert.auto.tfvars"
+if [ -f "$ALERT_TFVARS" ]; then
+  ALERT_EMAIL=$(sed -n 's/^[[:space:]]*alert_notification_email[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' "$ALERT_TFVARS" | head -1)
+else
+  ALERT_EMAIL=""
+fi
+
+if [ -n "$ALERT_EMAIL" ]; then
+  echo "ALERT_NOTIFICATION_EMAIL = ${ALERT_EMAIL}"
+  gh secret set ALERT_NOTIFICATION_EMAIL --body "${ALERT_EMAIL}"
+else
+  echo "警告: ${ALERT_TFVARS} に alert_notification_email が見つかりません。"
+  echo "      ALERT_NOTIFICATION_EMAIL を設定しないまま Actions からデプロイすると、"
+  echo "      失敗通知（Monitoring アラート）が削除されます。"
+fi
+
 echo "GitHub Actions Secrets を設定しました。"

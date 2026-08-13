@@ -37,7 +37,11 @@ jobs:
         run: uv run python tools/ensure_state_bucket.py
 
       # 2. GCSからテナント設定を取得して各種設定ファイルを生成
+      #    失敗通知の宛先は公開リポジトリに置けないため Secret から渡す。
+      #    未設定だと Monitoring のアラートが削除される点に注意（generate_configs.py が警告を出す）。
       - name: Generate Configs from GCS
+        env:
+          ALERT_NOTIFICATION_EMAIL: ${{ secrets.ALERT_NOTIFICATION_EMAIL }}
         run: uv run python tools/generate_configs.py
 
       # 3. 生成された設定ファイルの保存

@@ -42,7 +42,11 @@
   - Cloud Run Job も、復旧不能なエラー（設定不備・レポートバケットアクセス不可・SQL 読込失敗）では **exit 1** にしてサイレント失敗を防ぐ。
 - 通知は **Cloud Monitoring のログベースアラート → Email 通知チャネル → Slack チャンネルの Integration メールアドレス**（当社ワークスペース）。
   - Email チャネルなので Slack OAuth アプリ（情シス承認）は不要。
-  - 宛先は `base_config.ini` の `alert_notification_email`。空なら通知リソースを作らない。
+  - 宛先が空なら通知リソースを作らない（＝既に在れば削除される）。
+- **宛先の受け渡し**: 宛先は公開リポジトリに置けないため `base_config.ini` は空のまま運用し、実値を次の二経路で与える。
+  - ローカル実行: `terraform/alert.auto.tfvars`（Git 管理外）
+  - GitHub Actions: Secret `ALERT_NOTIFICATION_EMAIL`（`make github-secrets` で設定。`generate_configs.py` が環境変数を優先採用する）
+  - どちらも無いと**アラートが黙って消える**ため、`generate_configs.py` は未設定時に警告を出す。
 
 ## 監視の方針
 

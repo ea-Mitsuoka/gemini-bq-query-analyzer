@@ -15,6 +15,24 @@ BACKEND_TF_PATH = os.path.join(TFVARS_DIR, "backend.tf")
 
 TENANTS_CONFIG_PATH = "config/tenants.json"
 
+# 失敗通知の宛先を渡す環境変数（GitHub Actions の Secret から注入する）
+ALERT_EMAIL_ENV = "ALERT_NOTIFICATION_EMAIL"
+
+
+def resolve_alert_email(config):
+    """失敗通知の宛先メールを解決する。
+
+    宛先（Slackチャンネルの Integration メール）は公開リポジトリに置けないため、
+    base_config.ini は空のまま運用し、実値は次のどちらかで与える:
+      - ローカル: terraform/alert.auto.tfvars（Git 管理外）
+      - CI:       環境変数 ALERT_NOTIFICATION_EMAIL（GitHub Actions Secret）
+    環境変数があればそちらを優先する。
+    """
+    from_env = os.environ.get(ALERT_EMAIL_ENV, "").strip()
+    if from_env:
+        return from_env
+    return config.get("gcp", "alert_notification_email", fallback="").strip()
+
 
 def main():
     # 1. base_config.ini の読み込み
@@ -34,8 +52,14 @@ def main():
         print(f"エラー: base_config.ini の設定項目が不足しています: {e}")
         sys.exit(1)
 
-    # 失敗通知の宛先メール（任意。未設定なら通知アラートは無効化される）
-    alert_email = config.get("gcp", "alert_notification_email", fallback="").strip()
+    # 失敗通知の宛先メール（任意。未設定なら通知アラートは作られない）
+    alert_email = resolve_alert_email(config)
+    if not alert_email:
+        # 黙って無効化されると失敗に気付けなくなるため、必ず見えるところに出す
+        print(
+            f"警告: 失敗通知の宛先が未設定です（{ALERT_EMAIL_ENV} も base_config.ini も空）。\n"
+            "      Monitoring のアラートは作成されません。既に存在する場合は削除されます。"
+        )
 
     # 2. GCSからテナント設定を取得
     try:

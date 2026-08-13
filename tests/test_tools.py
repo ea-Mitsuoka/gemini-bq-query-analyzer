@@ -20,6 +20,41 @@ def test_template_columns_match_required():
     assert set(gt.COLUMNS) == ut.REQUIRED_COLUMNS
 
 
+def _config(ini_value):
+    import configparser
+
+    config = configparser.ConfigParser()
+    config.read_string(f"[gcp]\nalert_notification_email = {ini_value}\n")
+    return config
+
+
+def test_alert_email_prefers_env_over_ini(monkeypatch):
+    """CI では Secret（環境変数）が base_config.ini より優先されること。"""
+    gc = _load("generate_configs", "tools/generate_configs.py")
+    monkeypatch.setenv(gc.ALERT_EMAIL_ENV, "from-secret@example.com")
+    assert gc.resolve_alert_email(_config("from-ini@example.com")) == "from-secret@example.com"
+
+
+def test_alert_email_falls_back_to_ini(monkeypatch):
+    gc = _load("generate_configs", "tools/generate_configs.py")
+    monkeypatch.delenv(gc.ALERT_EMAIL_ENV, raising=False)
+    assert gc.resolve_alert_email(_config("from-ini@example.com")) == "from-ini@example.com"
+
+
+def test_alert_email_empty_when_neither_set(monkeypatch):
+    """空文字なら通知リソースを作らない（＝アラートが消える）ため、挙動を固定しておく。"""
+    gc = _load("generate_configs", "tools/generate_configs.py")
+    monkeypatch.setenv(gc.ALERT_EMAIL_ENV, "   ")
+    assert gc.resolve_alert_email(_config("")) == ""
+
+
+def test_deploy_workflow_passes_alert_email_secret():
+    """deploy.yml が Secret を generate_configs.py に渡していること（CI でアラートが消えるのを防ぐ）。"""
+    gc = _load("generate_configs", "tools/generate_configs.py")
+    deploy = (ROOT / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
+    assert f"{gc.ALERT_EMAIL_ENV}: ${{{{ secrets.{gc.ALERT_EMAIL_ENV} }}}}" in deploy
+
+
 def test_ensure_state_bucket_constants():
     esb = _load("ensure_state_bucket", "tools/ensure_state_bucket.py")
     assert esb.STATE_BUCKET_ROLE == "roles/storage.objectAdmin"
