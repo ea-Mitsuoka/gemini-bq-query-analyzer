@@ -27,7 +27,8 @@ variable "bq_dataset_id" {
 }
 
 # 削除保護フラグ。false の間は make destroy がゲートで拒否される。
-# また BigQuery データセットは allow_destroy=true のときのみ中身ごと破棄を許可する。
+# また BigQuery データセットは allow_destroy=true のときのみ中身ごと破棄を許可し、
+# Cloud Run v2（Job / Service）は allow_destroy=false の間 deletion_protection で保護される。
 # 破棄したい場合は true に変更して apply（make unlock）した上で destroy（make destroy）する。
 variable "allow_destroy" {
   type    = bool

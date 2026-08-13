@@ -31,6 +31,9 @@ resource "google_cloud_run_v2_service" "antipattern_api" {
   location = var.region
   project  = var.saas_project_id
 
+  # 誤削除の防止。make unlock（allow_destroy=true）でのみ削除可能にする。
+  deletion_protection = !var.allow_destroy
+
   template {
     containers {
       # ビルドされたイメージ名を指定（プロジェクト内のArtifact Registry等を参照）

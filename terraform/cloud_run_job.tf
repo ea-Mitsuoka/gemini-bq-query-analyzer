@@ -9,6 +9,9 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
   location = var.region
   project  = var.saas_project_id
 
+  # 誤削除の防止。make unlock（allow_destroy=true）でのみ削除可能にする。
+  deletion_protection = !var.allow_destroy
+
   template {
     template {
       service_account = data.google_service_account.analyzer_sa.email
