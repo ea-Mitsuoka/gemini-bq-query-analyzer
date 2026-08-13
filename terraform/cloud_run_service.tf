@@ -34,6 +34,13 @@ resource "google_cloud_run_v2_service" "antipattern_api" {
   # 誤削除の防止。make unlock（allow_destroy=true）でのみ削除可能にする。
   deletion_protection = !var.allow_destroy
 
+  # provider 6 では API が返す scaling ブロックと「設定に書いていない」状態が食い違い、
+  # 毎回 plan に差分が出続ける（永久差分）。実値と同じ既定値を明示して抑える。
+  scaling {
+    min_instance_count    = 0
+    manual_instance_count = 0
+  }
+
   template {
     containers {
       # ビルドされたイメージ名を指定（プロジェクト内のArtifact Registry等を参照）
