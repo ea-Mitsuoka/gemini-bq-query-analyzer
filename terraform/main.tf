@@ -4,8 +4,9 @@ terraform {
 
   required_providers {
     google = {
-      source  = "hashicorp/google"
-      version = "~> 5.0"
+      source = "hashicorp/google"
+      # Cloud Run v2 の deletion_protection は 6.0 以降でのみ利用可能
+      version = "~> 6.0"
     }
     time = {
       source  = "hashicorp/time"
