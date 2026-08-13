@@ -22,7 +22,7 @@
 1. **Workflow 層を一次検知点にする。**
    - パイプライン全体を `try/except` で囲み、失敗時は構造化ログ `ANALYZER_FAILURE tenant=... error=...` を `severity=ERROR` で出力してから `reraise` する。
    - Job の実行結果も Workflow 側で確認する（`map.get(execution_status, "failedCount")` で失敗数を見る。キー欠如で KeyError にならないよう直接参照は避ける）。
-2. **Cloud Run Job も復旧不能エラーでは exit 1 にする。**
+1. **Cloud Run Job も復旧不能エラーでは exit 1 にする。**
    - 設定不備 / レポートバケットにアクセス不可 / SQL 読込失敗 は `sys.exit(1)` にして、サイレントな exit 0 をやめる。
    - 「対象リージョンなし」など正常な空結果は summary を書いて exit 0 に留める（失敗ではない）。
 
