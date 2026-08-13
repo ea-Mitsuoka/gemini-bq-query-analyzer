@@ -32,6 +32,8 @@ BQ_ANTIPATTERN_API_URL = os.getenv("BQ_ANTIPATTERN_API_URL")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
 LOCATION = "us-central1"  # Vertex AIのリージョン
 REPORT_URL_EXPIRY_DAYS = 7  # レポート署名付きURLの有効期限（日）
+# Workflow が通知用に読みに行く固定パス。workflows/analyzer_workflow.yaml と対で変更すること。
+SUMMARY_BLOB_PATH = "results/summary.json"
 # 調査期間の環境変数を取得
 TIME_RANGE_INTERVAL = os.getenv("TIME_RANGE_INTERVAL", "1 DAY")
 TIME_RANGE_START = os.getenv("TIME_RANGE_START")
@@ -378,8 +380,8 @@ def save_summary_for_workflow(bucket_name, text_summary, customer_project_id, re
     try:
         storage_client = storage.Client(project=customer_project_id)
         bucket = storage_client.bucket(bucket_name)
-        # Workflowが期待するパス "results/summary.json"
-        blob = bucket.blob("results/summary.json")
+        # Workflowが期待するパス（SUMMARY_BLOB_PATH）
+        blob = bucket.blob(SUMMARY_BLOB_PATH)
 
         data = {
             "text_summary": text_summary,
