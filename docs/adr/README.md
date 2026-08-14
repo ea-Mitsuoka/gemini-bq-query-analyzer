@@ -8,3 +8,5 @@
 | [0002](0002-failure-detection-workflow-layer.md) | 失敗検知は Workflow 層で行い、復旧不能エラーは exit 1 にする                   | Accepted   |
 | [0003](0003-signed-url-delivery.md)              | レポートは顧客 GCS に保存し、期限付き V4 署名付きURLで配信する                 | Accepted   |
 | [0004](0004-terraform-state-backend.md)          | Terraform の state backend は本ツール同梱の bootstrap で自動構築する           | Accepted   |
+| [0005](0005-tenant-email-delivery.md)            | テナントへのメール配信手段の選定                                               | Proposed   |
+| [0006](0006-customer-self-service-execution.md)  | 顧客セルフサービス実行の提供方式                                               | Proposed   |
