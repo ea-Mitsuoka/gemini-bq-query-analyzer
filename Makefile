@@ -24,8 +24,10 @@ PROTECT_TFVARS := $(TF_DIR)/allow_destroy.auto.tfvars
 # lint / 対象 Python パス
 PY_SRC  := tools main-app/src bq-antipattern-api/app.py tests
 
-# mdformat 対象 Markdown（git 管理下のみ。.venv 等の依存物や gitignore 対象を自動除外）
-MD_FILES := $(shell git ls-files '*.md')
+# mdformat 対象 Markdown（.venv 等の依存物や gitignore 対象は自動除外）。
+# --others を付けて「まだ add していない新規ファイル」も対象にする。追跡済みのみを見ると、
+# 新規 Markdown を書いた直後の lint が素通りし、commit 後に CI で初めて落ちる（実際に2度発生）。
+MD_FILES := $(shell git ls-files --cached --others --exclude-standard '*.md')
 
 .DEFAULT_GOAL := help
 
