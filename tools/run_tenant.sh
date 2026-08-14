@@ -37,11 +37,27 @@ ARG=$(echo "$TENANTS_JSON" | jq -c --arg t "$TENANT" '.[$t] | {
 }')
 
 echo "オンデマンド実行: tenant=${TENANT}（完了まで待機します）"
-RESULT=$(gcloud workflows run gemini-bq-query-analyzer-workflow \
+# gcloud workflows run は実行が FAILED でも終了コード 0 を返すため、
+# 返却 JSON の state を必ず確認する（失敗を成功に見せない）。
+if ! OUT=$(gcloud workflows run gemini-bq-query-analyzer-workflow \
   --project "$PROJECT" --location "$REGION" \
-  --data "$ARG" --format="value(result)")
+  --data "$ARG" --format=json); then
+  echo "エラー: Workflow の実行に失敗しました。" >&2
+  exit 1
+fi
+
+STATE=$(echo "$OUT" | jq -r '.state // "UNKNOWN"')
+if [ "$STATE" != "SUCCEEDED" ]; then
+  echo >&2
+  echo "エラー: Workflow が失敗しました (state=${STATE})。" >&2
+  echo "$OUT" | jq -r '.error.payload // "詳細なし"' >&2
+  echo >&2
+  echo "詳細は Cloud Logging で ANALYZER_FAILURE を検索してください。" >&2
+  exit 1
+fi
 
 # Workflow の返り値（要点＋署名付きURL）を実行者に表示する
+RESULT=$(echo "$OUT" | jq -r '.result // empty')
 echo
 echo "===== 分析結果 ====="
 echo "$RESULT" | jq -r '"サマリ: " + (.text_summary // "N/A") + "\nレポート(署名付きURL、7日間有効):\n" + (.report_url // "N/A")' 2>/dev/null \

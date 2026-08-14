@@ -71,6 +71,17 @@ def test_check_sh_reads_gemini_settings_from_main_py():
         assert f"\n{name} = " in main_py, f"main.py の {name} 定義形式が変わった"
 
 
+def test_run_tenant_fails_when_workflow_fails():
+    """make run が Workflow の失敗を成功に見せないこと。
+
+    gcloud workflows run は実行が FAILED でも終了コード 0 を返すため、
+    state を見て明示的に落とす必要がある。
+    """
+    script = (ROOT / "tools" / "run_tenant.sh").read_text(encoding="utf-8")
+    assert '"$STATE" != "SUCCEEDED"' in script, "Workflow の state を検査していない"
+    assert "--format=json" in script, "state を取得できる形式で受け取っていない"
+
+
 def test_ensure_state_bucket_constants():
     esb = _load("ensure_state_bucket", "tools/ensure_state_bucket.py")
     assert esb.STATE_BUCKET_ROLE == "roles/storage.objectAdmin"
