@@ -32,7 +32,13 @@ def _make_stub(name, attrs):
 
 @pytest.fixture(scope="session")
 def main_app():
-    """main-app/src/main.py をスタブ付きでロードして返す。"""
+    """main-app/src/main.py をスタブ付きでロードして返す。
+
+    __pycache__ を作らせない。main-app 配下のファイル一覧は Cloud Run Job の
+    再ビルド判定（src_hash）に使われるため、テストが副産物を残すと
+    無関係な再ビルドを誘発する。
+    """
+    sys.dont_write_bytecode = True
     saved = {name: sys.modules.get(name) for name in _STUB_MODULES}
     for name, attrs in _STUB_MODULES.items():
         if name in sys.modules:

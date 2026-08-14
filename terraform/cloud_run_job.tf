@@ -62,8 +62,16 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
 
 # main-app のビルド（共通）
 resource "null_resource" "build_main_app_image" {
+  # ソース変更でのみ再ビルドさせる。ローカルの .venv やバイトコードキャッシュを含めると
+  # テスト実行や pip 操作だけでハッシュが変わって無意味な再ビルドが走り、
+  # さらに .venv を持たない CI とローカルでハッシュが一致しなくなる。
+  # （ビルド文脈からの除外は .gcloudignore が担当。ここは再ビルド判定用。）
   triggers = {
-    src_hash = sha256(join("", [for f in fileset("${path.module}/../main-app", "**") : filesha256("${path.module}/../main-app/${f}")]))
+    src_hash = sha256(join("", [
+      for f in fileset("${path.module}/../main-app", "**") :
+      filesha256("${path.module}/../main-app/${f}")
+      if !can(regex("(^|/)(\\.venv|__pycache__|\\.pytest_cache|\\.ruff_cache)/", f)) && !endswith(f, ".pyc")
+    ]))
   }
 
   provisioner "local-exec" {
