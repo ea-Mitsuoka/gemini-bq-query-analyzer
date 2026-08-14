@@ -33,7 +33,7 @@ GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
 # Vertex AI のリージョン。Gemini 3.x 系はリージョン別エンドポイントには無く
 # global エンドポイントでのみ提供されるため "global" を使う（us-central1 では 404 になる）。
 LOCATION = "global"
-GEMINI_MODEL = "gemini-3.6-flash"
+GEMINI_MODEL = "gemini-3.7-flash"
 REPORT_URL_EXPIRY_DAYS = 7  # レポート署名付きURLの有効期限（日）
 # Workflow が通知用に読みに行く固定パス。workflows/analyzer_workflow.yaml と対で変更すること。
 SUMMARY_BLOB_PATH = "results/summary.json"
