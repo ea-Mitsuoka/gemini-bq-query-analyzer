@@ -14,6 +14,7 @@ command -v gcloud    >/dev/null 2>&1 && ok "gcloud"    || ng "gcloud 未イン�
 command -v terraform >/dev/null 2>&1 && ok "terraform" || ng "terraform 未インストール"
 command -v uv        >/dev/null 2>&1 && ok "uv"        || info "uv 未インストール（make install で使用）"
 command -v jq        >/dev/null 2>&1 && ok "jq"        || info "jq 未インストール（手動構築手順で使用）"
+command -v curl      >/dev/null 2>&1 && ok "curl"      || info "curl 未インストール（Gemini 到達性チェックで使用）"
 
 echo "== 設定ファイル =="
 if [ -f base_config.ini ]; then
@@ -61,6 +62,44 @@ secretmanager.googleapis.com storage.googleapis.com cloudbuild.googleapis.com"
       fi
     else
       ng "tfstate バケットが存在しない: ${TFSTATE_BUCKET}（make ensure-bucket で作成）"
+    fi
+  fi
+fi
+
+echo "== Gemini 到達性 =="
+# モデルは「カタログに存在する」だけでは呼べず、提供エンドポイント（リージョン/global）が
+# モデルごとに異なる。組み合わせが不正でも本番では例外が握り潰されがちなので、
+# デプロイ前にここで 1 回だけ実際に叩いて確認する。
+# 名前を二重管理するとドリフトするため、値は main.py から読む。
+MAIN_PY="main-app/src/main.py"
+GEMINI_MODEL=$(sed -n 's/^GEMINI_MODEL[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' "$MAIN_PY" | head -1)
+GEMINI_LOCATION=$(sed -n 's/^LOCATION[[:space:]]*=[[:space:]]*"\(.*\)".*/\1/p' "$MAIN_PY" | head -1)
+
+if [ -z "$GEMINI_MODEL" ] || [ -z "$GEMINI_LOCATION" ]; then
+  ng "${MAIN_PY} から GEMINI_MODEL / LOCATION を読み取れない（定義名が変わった可能性）"
+elif ! command -v curl >/dev/null 2>&1 || ! command -v gcloud >/dev/null 2>&1 || [ -z "$PROJECT" ]; then
+  info "Gemini 到達性チェックはスキップ（curl / gcloud / プロジェクト設定が必要）"
+else
+  if [ "$GEMINI_LOCATION" = "global" ]; then
+    AI_HOST="aiplatform.googleapis.com"
+  else
+    AI_HOST="${GEMINI_LOCATION}-aiplatform.googleapis.com"
+  fi
+  TOKEN=$(gcloud auth print-access-token 2>/dev/null || true)
+  if [ -z "$TOKEN" ]; then
+    info "Gemini 到達性チェックはスキップ（アクセストークンを取得できない）"
+  else
+    CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 -X POST \
+      "https://${AI_HOST}/v1/projects/${PROJECT}/locations/${GEMINI_LOCATION}/publishers/google/models/${GEMINI_MODEL}:generateContent" \
+      -H "Authorization: Bearer ${TOKEN}" \
+      -H "x-goog-user-project: ${PROJECT}" \
+      -H "Content-Type: application/json" \
+      -d '{"contents":[{"role":"user","parts":[{"text":"ping"}]}],"generationConfig":{"maxOutputTokens":1}}' 2>/dev/null || true)
+    if [ "$CODE" = "200" ]; then
+      ok "Gemini 呼び出し可: ${GEMINI_MODEL} @ ${GEMINI_LOCATION}"
+    else
+      ng "Gemini 呼び出し不可: ${GEMINI_MODEL} @ ${GEMINI_LOCATION} (HTTP ${CODE:-応答なし})"
+      ng "  モデルの提供エンドポイントを確認してください（3.x 系は global のみの場合あり）"
     fi
   fi
 fi

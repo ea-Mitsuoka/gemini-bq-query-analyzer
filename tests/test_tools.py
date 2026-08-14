@@ -55,6 +55,22 @@ def test_deploy_workflow_passes_alert_email_secret():
     assert f"{gc.ALERT_EMAIL_ENV}: ${{{{ secrets.{gc.ALERT_EMAIL_ENV} }}}}" in deploy
 
 
+def test_check_sh_reads_gemini_settings_from_main_py():
+    """check.sh が main.py の定義名を参照していること。
+
+    モデル名を check.sh 側にも書くと二重管理になりドリフトする。定義名を変えたら
+    check.sh の sed が空振りして「チェックしているのに素通り」になるため、名前を固定する。
+    """
+    check_sh = (ROOT / "tools" / "check.sh").read_text(encoding="utf-8")
+    assert "main-app/src/main.py" in check_sh
+    for name in ("GEMINI_MODEL", "LOCATION"):
+        assert f"^{name}" in check_sh, f"check.sh が {name} を抽出していない"
+
+    main_py = (ROOT / "main-app" / "src" / "main.py").read_text(encoding="utf-8")
+    for name in ("GEMINI_MODEL", "LOCATION"):
+        assert f"\n{name} = " in main_py, f"main.py の {name} 定義形式が変わった"
+
+
 def test_ensure_state_bucket_constants():
     esb = _load("ensure_state_bucket", "tools/ensure_state_bucket.py")
     assert esb.STATE_BUCKET_ROLE == "roles/storage.objectAdmin"
