@@ -30,7 +30,10 @@ SAAS_PROJECT_ID = os.getenv("SAAS_PROJECT_ID")
 CUSTOMER_PROJECT_ID = os.getenv("CUSTOMER_PROJECT_ID")
 BQ_ANTIPATTERN_API_URL = os.getenv("BQ_ANTIPATTERN_API_URL")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
-LOCATION = "us-central1"  # Vertex AIのリージョン
+# Vertex AI のリージョン。Gemini 3.x 系はリージョン別エンドポイントには無く
+# global エンドポイントでのみ提供されるため "global" を使う（us-central1 では 404 になる）。
+LOCATION = "global"
+GEMINI_MODEL = "gemini-3.6-flash"
 REPORT_URL_EXPIRY_DAYS = 7  # レポート署名付きURLの有効期限（日）
 # Workflow が通知用に読みに行く固定パス。workflows/analyzer_workflow.yaml と対で変更すること。
 SUMMARY_BLOB_PATH = "results/summary.json"
@@ -421,7 +424,7 @@ def main():
         sys.exit(1)
 
     vertexai.init(project=SAAS_PROJECT_ID, location=LOCATION)
-    model = GenerativeModel("gemini-3.5-flash")
+    model = GenerativeModel(GEMINI_MODEL)
 
     # 外部SQLファイルのロード
     try:
@@ -541,6 +544,7 @@ def main():
     report_lines.append(f"## 🚨 ワーストクエリ解析（計 {len(all_jobs)} 件）\n")
 
     # 6. 各クエリに対して解析とGemini生成を実行
+    gemini_failures = 0
     for i, job in enumerate(all_jobs, 1):
         logger.info(f"Analyzing Job {i}/{len(all_jobs)}: {job.job_id} ({job.region_name})")
         logger.info("Extracting schema...")
@@ -573,7 +577,12 @@ def main():
             report_lines.append(response.text)
             report_lines.append("\n---")
         except Exception as e:
+            gemini_failures += 1
             logger.error(f"Failed to generate content from Gemini for Job {job.job_id}: {e}")
+            report_lines.append(
+                f"### 🔍 ワーストクエリ {i}/{len(all_jobs)} (Job: `{job.job_id}`)\n\n"
+                "⚠️ このクエリの助言生成に失敗しました。\n\n---"
+            )
 
     # 7. レポートの結合と出力
     final_report = "\n".join(report_lines)
@@ -582,7 +591,14 @@ def main():
     )
 
     if console_url:
-        message = f"解析が完了しました。ワーストクエリ {len(all_jobs)} 件を分析しました。"
+        analyzed = len(all_jobs) - gemini_failures
+        if gemini_failures:
+            message = (
+                f"解析が完了しましたが、{len(all_jobs)} 件中 {gemini_failures} 件で"
+                "助言の生成に失敗しました。"
+            )
+        else:
+            message = f"解析が完了しました。ワーストクエリ {analyzed} 件を分析しました。"
         if not signed_url:
             message += "（署名付きURLの生成に失敗したため、GCSから直接ご確認ください）"
         save_summary_for_workflow(
@@ -594,6 +610,15 @@ def main():
             "解析が完了しましたが、レポートの保存に失敗しました。",
             CUSTOMER_PROJECT_ID,
         )
+
+    # 助言が1件も作れていないなら、レポートは出ていても実質的な失敗。
+    # 「成功したように見えて中身が無い」状態を検知できるよう exit 1 にする（ADR-0002）。
+    if gemini_failures == len(all_jobs):
+        logger.error(
+            f"すべてのワーストクエリ（{len(all_jobs)} 件）で Gemini の生成に失敗しました。"
+            f"モデル '{GEMINI_MODEL}' がリージョン '{LOCATION}' で利用可能か確認してください。"
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":
