@@ -61,6 +61,16 @@ jobs:
         with:
           terraform_version: "1.15.7"
 
+      # 4.5 デプロイ前ゲート。API 有効化・テナント設定・Gemini モデルの到達性を確認する。
+      #     ここで落とせば、壊れた設定を本番へ apply せずに済む。
+      #     check.sh は gcloud の既定プロジェクトが base_config.ini と一致することを見るため、
+      #     Actions 上では明示的に設定しておく。
+      - name: Preflight check
+        run: |
+          gcloud config set project \
+            "$(sed -n 's/^[[:space:]]*saas_project_id[[:space:]]*=[[:space:]]*//p' base_config.ini | head -1 | tr -d ' ')"
+          make check
+
       # 5. Terraform Init & Apply
       - name: Terraform Init & Apply
         run: |

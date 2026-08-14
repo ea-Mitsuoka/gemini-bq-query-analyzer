@@ -17,6 +17,10 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
       service_account = data.google_service_account.analyzer_sa.email
       timeout         = "600s"
 
+      # 既定の 3 回だと、設定不備のような復旧不能エラーでも全リトライを消化してから
+      # 失敗が確定し、通知が十数分遅れる（実測）。一時障害の救済は残しつつ短縮する。
+      max_retries = 1
+
       containers {
         image = "${var.region}-docker.pkg.dev/${var.saas_project_id}/cloud-run-source-deploy/gemini-bq-query-analyzer-job:latest"
 
