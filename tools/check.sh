@@ -28,8 +28,16 @@ fi
 
 echo "== 認証 =="
 if command -v gcloud >/dev/null 2>&1; then
+  # 認証の有無は「トークンを取得できるか」で判定する。CI（Workload Identity 連携）では
+  # 認証情報がファイル指定で渡り auth list に現れないため、ファイルや一覧の有無では測れない。
   ACTIVE=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null || true)
-  [ -n "$ACTIVE" ] && ok "gcloud 認証済み: ${ACTIVE}" || ng "gcloud 未認証（make setup を実行）"
+  if [ -n "$ACTIVE" ]; then
+    ok "gcloud 認証済み: ${ACTIVE}"
+  elif gcloud auth print-access-token >/dev/null 2>&1; then
+    ok "gcloud 認証済み（アクセストークン取得可・CI 想定）"
+  else
+    ng "gcloud 未認証（make setup を実行）"
+  fi
 
   CUR_PROJECT=$(gcloud config get-value project 2>/dev/null || true)
   if [ -n "$PROJECT" ] && [ "$CUR_PROJECT" = "$PROJECT" ]; then
@@ -38,8 +46,15 @@ if command -v gcloud >/dev/null 2>&1; then
     ng "デフォルトプロジェクト不一致（現在: ${CUR_PROJECT:-未設定} / 期待: ${PROJECT:-不明}）"
   fi
 
+  # ローカルは既定パス、CI は GOOGLE_APPLICATION_CREDENTIALS で渡る。
   ADC="${HOME}/.config/gcloud/application_default_credentials.json"
-  [ -f "$ADC" ] && ok "ADC 認証情報が存在" || ng "ADC 未設定（make setup を実行）"
+  if [ -f "$ADC" ]; then
+    ok "ADC 認証情報が存在"
+  elif [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ] && [ -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]; then
+    ok "ADC 認証情報が存在（GOOGLE_APPLICATION_CREDENTIALS）"
+  else
+    ng "ADC 未設定（make setup を実行）"
+  fi
 fi
 
 echo "== GCP リソース =="
