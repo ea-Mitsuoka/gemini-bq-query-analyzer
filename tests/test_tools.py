@@ -82,6 +82,25 @@ def test_run_tenant_fails_when_workflow_fails():
     assert "--format=json" in script, "state を取得できる形式で受け取っていない"
 
 
+def test_rebuild_trigger_covers_every_dockerfile_copy():
+    """Cloud Run Job の再ビルド判定が Dockerfile の COPY 対象を網羅していること。
+
+    COPY を足したのに判定側に足し忘れると、イメージの中身が変わっても再ビルドされず、
+    古いコードが動き続ける（気付きにくい）。
+    """
+    dockerfile = (ROOT / "main-app" / "Dockerfile").read_text(encoding="utf-8")
+    sources = [
+        line.split()[1].rstrip("/")
+        for line in dockerfile.splitlines()
+        if line.strip().startswith("COPY ")
+    ]
+    assert sources, "Dockerfile から COPY 対象を抽出できなかった"
+
+    tf = (ROOT / "terraform" / "cloud_run_job.tf").read_text(encoding="utf-8")
+    for src in sources:
+        assert src in tf, f"再ビルド判定に {src} が含まれていない"
+
+
 def test_ensure_state_bucket_constants():
     esb = _load("ensure_state_bucket", "tools/ensure_state_bucket.py")
     assert esb.STATE_BUCKET_ROLE == "roles/storage.objectAdmin"

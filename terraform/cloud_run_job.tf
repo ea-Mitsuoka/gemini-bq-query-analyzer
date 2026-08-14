@@ -1,3 +1,18 @@
+locals {
+  main_app_dir = "${path.module}/../main-app"
+
+  # main-app/Dockerfile の COPY 対象と対で維持すること（tests/test_tools.py が検査する）。
+  # バイトコードはイメージに入れる意味がなく、実行環境で再生成されるため除外する。
+  main_app_build_files = [
+    for f in concat(
+      ["Dockerfile", "requirements.txt"],
+      [for f in fileset(local.main_app_dir, "src/**") : f],
+      [for f in fileset(local.main_app_dir, "sql/**") : f],
+      [for f in fileset(local.main_app_dir, "prompts/**") : f],
+    ) : f if !can(regex("(^|/)__pycache__/", f)) && !endswith(f, ".pyc")
+  ]
+}
+
 # ビルド完了後に30秒待つリソース
 resource "time_sleep" "wait_30_seconds_after_build" {
   depends_on      = [null_resource.build_main_app_image]
@@ -66,15 +81,13 @@ resource "google_cloud_run_v2_job" "analyzer_job" {
 
 # main-app のビルド（共通）
 resource "null_resource" "build_main_app_image" {
-  # ソース変更でのみ再ビルドさせる。ローカルの .venv やバイトコードキャッシュを含めると
-  # テスト実行や pip 操作だけでハッシュが変わって無意味な再ビルドが走り、
-  # さらに .venv を持たない CI とローカルでハッシュが一致しなくなる。
-  # （ビルド文脈からの除外は .gcloudignore が担当。ここは再ビルド判定用。）
+  # 再ビルドは「イメージの中身が変わったとき」だけで良いので、Dockerfile が COPY する
+  # ファイル群（＋Dockerfile 自身）だけをハッシュ対象にする。
+  # main-app/** を丸ごと対象にすると、ローカルにしか無い docs/ の下書きや .venv、
+  # テストが残す __pycache__ でもハッシュが変わり、CI とローカルで一致しない（実測）。
   triggers = {
     src_hash = sha256(join("", [
-      for f in fileset("${path.module}/../main-app", "**") :
-      filesha256("${path.module}/../main-app/${f}")
-      if !can(regex("(^|/)(\\.venv|__pycache__|\\.pytest_cache|\\.ruff_cache)/", f)) && !endswith(f, ".pyc")
+      for f in local.main_app_build_files : filesha256("${local.main_app_dir}/${f}")
     ]))
   }
 
