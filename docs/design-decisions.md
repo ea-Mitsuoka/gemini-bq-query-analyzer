@@ -43,6 +43,7 @@
 - 通知は **Cloud Monitoring のログベースアラート → Email 通知チャネル → Slack チャンネルの Integration メールアドレス**（当社ワークスペース）。
   - Email チャネルなので Slack OAuth アプリ（情シス承認）は不要。
   - 宛先が空なら通知リソースを作らない（＝既に在れば削除される）。
+  - 通知には**どのテナントが失敗したか**を含める。`label_extractors` で `ANALYZER_FAILURE` ログから `tenant` / `customer` を抽出し、`documentation` の件名・本文に埋め込む。これが無いと通知に Workflow のリソースラベルしか出ず、マルチテナントでは毎回 Cloud Logging を開く必要が生じる。
 - **宛先の受け渡し**: 宛先は公開リポジトリに置けないため `base_config.ini` は空のまま運用し、実値を次の二経路で与える。
   - ローカル実行: `terraform/alert.auto.tfvars`（Git 管理外）
   - GitHub Actions: Secret `ALERT_NOTIFICATION_EMAIL`（`make github-secrets` で設定。`generate_configs.py` が環境変数を優先採用する）
